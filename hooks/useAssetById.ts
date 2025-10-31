@@ -41,17 +41,8 @@ export function useAssetById() {
         .use(walletAdapterIdentity(wallet.adapter))
         .use(dasApi());
 
-      console.log("Attempting to fetch asset by ID:", assetId);
-      
       try {
         const assetData = await umi.rpc.getAsset(publicKey(assetId));
-        
-        console.log("Asset data received:", {
-          id: assetData?.id,
-          compressed: assetData?.compression?.compressed,
-          hasOwner: !!assetData?.ownership?.owner,
-          owner: assetData?.ownership?.owner
-        });
 
         if (!assetData) {
           throw new Error("Asset not found");
@@ -70,8 +61,6 @@ export function useAssetById() {
           compressed: assetData.compression?.compressed === true,
         };
 
-        console.log("✅ Asset fetched successfully:", fetchedAsset);
-        console.log("Asset owner matches wallet:", fetchedAsset.owner === wallet?.adapter?.publicKey?.toBase58());
         setAsset(fetchedAsset);
       } catch (fetchError: any) {
         const errorMsg = fetchError?.message || String(fetchError);
@@ -80,7 +69,6 @@ export function useAssetById() {
         // Check for 403/authentication errors
         if (errorString.includes("403") || errorString.includes("access forbidden") || errorString.includes("forbidden")) {
           const authError = "Helius DAS API access forbidden. Check your HELIUS_RPC_URL environment variable.";
-          console.error("❌", authError);
           setError(authError);
           setAsset(null);
           return;
@@ -88,13 +76,10 @@ export function useAssetById() {
         
         // Don't log "not found" as an error - it's expected if asset isn't indexed yet
         if (errorMsg.includes("not found") || errorMsg.includes("404") || errorMsg.includes("Asset not found")) {
-          console.log("ℹ️ Asset not yet indexed by Helius DAS API. This is normal - wait 30-60 seconds.");
-          setError(null); // Don't show error to user - it's expected during indexing
+          setError(null);
           setAsset(null);
-          return; // Early return instead of throwing
+          return;
         }
-        // Only log/throw for unexpected errors
-        console.error("❌ Unexpected error fetching asset by ID:", fetchError);
         throw fetchError;
       }
     } catch (err) {

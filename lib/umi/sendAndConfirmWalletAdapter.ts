@@ -18,8 +18,6 @@ const sendAndConfirmWalletAdapter = async (
     throw new Error('No wallet connected');
   }
   
-  console.log('currentSigner', currentSigner);
-  // Use walletAdapterIdentity for proper wallet adapter integration
   umi.use(walletAdapterIdentity(currentSigner as any));
 
   const blockhash = await umi.rpc.getLatestBlockhash({

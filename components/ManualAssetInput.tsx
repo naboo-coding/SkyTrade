@@ -12,36 +12,24 @@ export default function ManualAssetInput() {
   const handleAddAsset = async () => {
     if (!assetId.trim()) return;
     
-    console.log("🚀 Starting manual asset addition for ID:", assetId.trim());
     setAdding(true);
     try {
-      // Try to add the asset by ID first (if it exists but isn't indexed in owner list)
       if (addAssetById) {
-        console.log("Calling addAssetById...");
         const result = await addAssetById(assetId.trim());
-        console.log("addAssetById completed with result:", result);
         
         if (result.success) {
-          // Show success message
-          const successMsg = "✅ Asset added successfully! It should appear in the gallery above.";
-          console.log(successMsg);
-          alert(successMsg);
+          alert("✅ Asset added successfully! It should appear in the gallery above.");
           setAssetId("");
           setShowInput(false);
         } else {
-          // Show error message
-          const errorMsg = result.error || "Failed to add asset. Please check the console for details.";
-          console.error("❌", errorMsg);
+          const errorMsg = result.error || "Failed to add asset.";
           alert(`❌ ${errorMsg}`);
         }
       } else {
-        console.warn("addAssetById function not available, just refetching...");
-        // Fallback to just refetching
         await refetch();
         alert("⚠️ Manual add not available. Refreshing assets instead...");
       }
     } catch (err) {
-      console.error("❌ Error adding asset:", err);
       const errorMsg = err instanceof Error ? err.message : String(err);
       alert(`❌ Error adding asset: ${errorMsg}`);
     } finally {

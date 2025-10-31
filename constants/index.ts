@@ -13,4 +13,3 @@ export const PROTOCOL_PERCENT_FEE = 5;
 
 // Devnet RPC - should be set in environment variables
 export const HELIUS_RPC_URL = process.env.NEXT_PUBLIC_HELIUS_RPC_URL || "";
-

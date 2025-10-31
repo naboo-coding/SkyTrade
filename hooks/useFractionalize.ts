@@ -53,9 +53,6 @@ export function useFractionalize() {
     setSignature(null);
 
     try {
-      // Verify we're using the correct endpoint
-      console.log("Fractionalizing on network:", network, "Endpoint:", endpoint);
-      
       // Ensure endpoint is explicitly devnet if we're on devnet
       // WalletAdapterNetwork.Devnet is the constant value "devnet"
       const isDevnet = network === WalletAdapterNetwork.Devnet;
@@ -403,7 +400,6 @@ export function useFractionalize() {
         // Always check logs first, even if there's an error - logs contain the actual failure reason
         if (simulationResult.value.logs && simulationResult.value.logs.length > 0) {
           const logsString = simulationResult.value.logs.join(' ');
-          console.log("Simulation logs:", simulationResult.value.logs);
           
           // Only check for the EXACT burned NFT indicator - "Invalid root recomputed from proof"
           // This is the specific error that means the NFT was burned
@@ -417,7 +413,6 @@ export function useFractionalize() {
         if (simulationResult.value.err) {
           // Check if the error is related to burned NFT
           const errorString = JSON.stringify(simulationResult.value.err);
-          console.log("Simulation error:", errorString);
           
           // Only check for the EXACT burned NFT error - be very specific
           // "Invalid root recomputed from proof" is the definitive indicator of a burned NFT

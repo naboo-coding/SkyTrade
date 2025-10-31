@@ -14,12 +14,7 @@ export default function WalletInfo() {
       </span>
     );
   } catch (error) {
-    // Wallet context not available yet
     return null;
   }
 }
-
-
-
-
 

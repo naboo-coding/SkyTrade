@@ -26,14 +26,6 @@ const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGa
   const [deleteMode, setDeleteMode] = useState(false);
   const [assetsToDelete, setAssetsToDelete] = useState<Set<string>>(new Set());
 
-  // Debug: log when assets change
-  useEffect(() => {
-    console.log("📊 Gallery assets updated, count:", assets.length);
-    if (assets.length > 0) {
-      console.log("Assets in gallery:", assets.map(a => ({ id: a.id.slice(0, 16) + "...", name: a.name })));
-    }
-  }, [assets]);
-
   const handleImageError = (assetId: string) => {
     setImageErrors((prev) => new Set(prev).add(assetId));
   };

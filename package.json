@@ -40,7 +40,7 @@
   },
   "name": "skytrade",
   "version": "1.0.0",
-  "description": "",
+  "description": "Fractionalize compressed NFTs (cNFTs) on Solana into tradeable tokens",
   "main": "index.js",
   "scripts": {
     "dev": "next dev --webpack",
@@ -48,8 +48,17 @@
     "start": "next start",
     "lint": "next lint"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "solana",
+    "nft",
+    "cnft",
+    "compressed-nft",
+    "fractionalization",
+    "defi",
+    "web3",
+    "nextjs",
+    "metaplex"
+  ],
   "license": "ISC",
   "type": "commonjs"
 }

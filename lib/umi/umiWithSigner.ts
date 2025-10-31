@@ -8,5 +8,3 @@ const umiWithSigner = (signer: Signer) => {
 };
 
 export default umiWithSigner;
-
-

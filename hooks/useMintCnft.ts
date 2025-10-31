@@ -49,9 +49,6 @@ export function useMintCnft() {
     setAssetId(null);
 
     try {
-      // Verify we're using the correct endpoint and network
-      console.log("Minting cNFT on network:", network, "Endpoint:", endpoint);
-      
       // Ensure endpoint is explicitly devnet if we're on devnet
       // WalletAdapterNetwork.Devnet is the constant value "devnet"
       const isDevnet = network === WalletAdapterNetwork.Devnet;
@@ -113,8 +110,6 @@ export function useMintCnft() {
       // 5. Mint cNFT
       // Ensure we're using the connected wallet's public key as the owner
       const ownerPublicKey = umi.payer.publicKey;
-      console.log("Minting cNFT to owner:", ownerPublicKey);
-      console.log("Merkle Tree:", merkleTree.publicKey.toString());
       
       await mintToCollectionV1(umi, {
         leafOwner: ownerPublicKey,
@@ -145,7 +140,6 @@ export function useMintCnft() {
       });
 
       // 6. Compute Asset ID - wait a moment for the mint transaction to fully settle
-      console.log("Waiting for transaction to finalize...");
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Note: leafIndex = 0 because we create a NEW tree each time (for testing)
@@ -155,15 +149,6 @@ export function useMintCnft() {
         merkleTree: merkleTree.publicKey,
         leafIndex,
       });
-
-      console.log("✅ Mint transaction completed!");
-      console.log("📦 Merkle Tree:", merkleTree.publicKey.toString());
-      console.log("🆔 Computed Asset ID:", assetIdPda.toString());
-      console.log("👤 Owner:", ownerPublicKey.toString());
-      console.log("\n⚠️ IMPORTANT: Helius DAS API indexing takes 30-60 seconds.");
-      console.log("   The asset exists on-chain but won't appear in API queries until indexed.");
-      console.log("   View it on explorer:", `https://explorer.solana.com/address/${assetIdPda.toString()}?cluster=devnet`);
-      console.log("");
       
       setAssetId(assetIdPda.toString());
       
