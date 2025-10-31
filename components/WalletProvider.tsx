@@ -31,11 +31,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Prevent hydration issues by not rendering wallet provider until mounted
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
   return (
     <ConnectionProvider endpoint={endpoint}>
       <SolanaWalletProvider wallets={wallets} autoConnect>

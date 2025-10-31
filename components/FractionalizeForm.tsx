@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useFractionalize } from "@/hooks/useFractionalize";
 import { PublicKey } from "@solana/web3.js";
 
@@ -16,6 +16,19 @@ export default function FractionalizeForm({
   onCancel,
 }: FractionalizeFormProps) {
   const { fractionalize, loading, error, signature } = useFractionalize();
+
+  // Reset form state when assetId changes (when user selects a different NFT)
+  // The component will remount with a new key, which resets all hook state including signature
+  useEffect(() => {
+    setFormData({
+      totalSupply: "7000000",
+      minLpAgeSeconds: "",
+      minReclaimPercent: "",
+      minLiquidityPercent: "",
+      minVolumePercent30d: "",
+      treasury: "",
+    });
+  }, [assetId]);
 
   const [formData, setFormData] = useState({
     totalSupply: "7000000", // Default: 7M tokens
@@ -62,18 +75,18 @@ export default function FractionalizeForm({
 
   if (signature) {
     return (
-      <div className="p-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-        <h3 className="text-lg font-semibold text-green-800 dark:text-green-200 mb-2">
+      <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+        <h3 className="text-base font-semibold text-green-800 dark:text-green-200 mb-1">
           Successfully Fractionalized!
         </h3>
-        <p className="text-sm text-green-700 dark:text-green-300 mb-4">
+        <p className="text-xs text-green-700 dark:text-green-300 mb-2 break-all">
           Transaction signature: {signature}
         </p>
         <a
           href={`https://solscan.io/tx/${signature}?cluster=devnet`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 dark:text-blue-400 hover:underline"
+          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
         >
           View on Solscan →
         </a>

@@ -68,6 +68,7 @@ export default function Home() {
                 </h2>
                 {selectedAssetId ? (
                   <FractionalizeForm
+                    key={selectedAssetId}
                     assetId={selectedAssetId}
                     onSuccess={(signature) => {
                       console.log("Fractionalization successful:", signature);

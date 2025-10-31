@@ -3,9 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
-import { dasApi } from "@metaplex-foundation/digital-asset-standard-api";
+import umiWithCurrentWalletAdapter from "@/lib/umi/umiWithCurrentWalletAdapter";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 
@@ -115,9 +113,7 @@ export function useCnftAssets() {
         return;
       }
       
-      const umi = createUmi(endpoint)
-        .use(walletAdapterIdentity(wallet.adapter))
-        .use(dasApi());
+      const umi = umiWithCurrentWalletAdapter();
 
       console.log("Fetching assets for owner:", ownerAddress.slice(0, 8) + "...");
       
@@ -427,9 +423,7 @@ export function useCnftAssets() {
     const trimmedAssetId = assetId.trim();
 
     try {
-      const umi = createUmi(endpoint)
-        .use(walletAdapterIdentity(wallet.adapter))
-        .use(dasApi());
+      const umi = umiWithCurrentWalletAdapter();
 
       console.log("🔍 Attempting to manually fetch asset by ID:", trimmedAssetId);
       console.log("Using endpoint:", endpoint);

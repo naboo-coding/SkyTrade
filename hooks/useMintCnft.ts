@@ -2,13 +2,10 @@
 
 import { useState, useCallback } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
-import { mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
-import { mplBubblegum, createTree, mintToCollectionV1, findLeafAssetIdPda, TokenStandard } from "@metaplex-foundation/mpl-bubblegum";
+import umiWithCurrentWalletAdapter from "@/lib/umi/umiWithCurrentWalletAdapter";
+import { createTree, mintToCollectionV1, findLeafAssetIdPda, TokenStandard } from "@metaplex-foundation/mpl-bubblegum";
 import { createNft } from "@metaplex-foundation/mpl-token-metadata";
 import { generateSigner, publicKey, percentAmount } from "@metaplex-foundation/umi";
-import { dasApi } from "@metaplex-foundation/digital-asset-standard-api";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { uploadImageToPinata as uploadImageUtil, uploadMetadataToPinata as uploadMetadataUtil } from "@/utils/uploadToPinata";
@@ -64,11 +61,7 @@ export function useMintCnft() {
            : "https://api.devnet.solana.com")
         : endpoint;
       
-      const umi = createUmi(devnetEndpoint)
-        .use(walletAdapterIdentity(wallet.adapter))
-        .use(mplTokenMetadata())
-        .use(mplBubblegum())
-        .use(dasApi());
+      const umi = umiWithCurrentWalletAdapter();
 
       // 1. Upload image if provided
       let imageUrl = params.imageUrl;
