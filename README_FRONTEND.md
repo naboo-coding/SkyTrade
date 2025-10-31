@@ -50,3 +50,4 @@ npm run dev
 - All fractionalization operations happen on Solana Devnet
 - Protocol fee is hardcoded to 5%
 
+
