@@ -75,14 +75,62 @@ export function useFractionalize() {
         .use(mplBubblegum())
         .use(dasApi());
 
-      // 1. Fetch asset and proof
+      // 1. First, validate that the NFT exists and is not burned
       const nftAssetId = params.assetId;
-      const assetWithProof = await getAssetWithProof(umi, umiPublicKey(nftAssetId), {
-        truncateCanopy: true,
-      });
+      let assetData;
+      try {
+        assetData = await umi.rpc.getAsset(umiPublicKey(nftAssetId));
+      } catch (fetchErr: any) {
+        const errMsg = fetchErr?.message || String(fetchErr);
+        if (errMsg.includes("not found") || errMsg.includes("404")) {
+          throw new Error("This NFT was not found. It may have been burned or deleted.");
+        }
+        throw new Error(`Failed to fetch NFT: ${errMsg}`);
+      }
+
+      // Check if asset exists and has valid ownership
+      if (!assetData) {
+        throw new Error("This NFT was not found. It may have been burned or deleted.");
+      }
+
+      // Check if the NFT is compressed
+      if (!assetData.compression?.compressed) {
+        throw new Error("This asset is not a compressed NFT (cNFT). Only cNFTs can be fractionalized.");
+      }
+
+      // Check ownership - if there's no owner, the NFT may be burned
+      const assetOwner = assetData.ownership?.owner;
+      if (!assetOwner) {
+        throw new Error("This NFT has no owner. It may have been burned.");
+      }
+
+      // Verify ownership matches the connected wallet
+      const walletAddress = publicKey.toBase58();
+      if (assetOwner.toLowerCase() !== walletAddress.toLowerCase()) {
+        throw new Error(`This NFT is owned by a different wallet. Owner: ${assetOwner.slice(0, 8)}...`);
+      }
+
+      // 2. Fetch asset and proof (this will fail if NFT is burned)
+      let assetWithProof;
+      try {
+        assetWithProof = await getAssetWithProof(umi, umiPublicKey(nftAssetId), {
+          truncateCanopy: true,
+        });
+      } catch (proofErr: any) {
+        const errMsg = proofErr?.message || String(proofErr);
+        // Check for burned NFT indicators
+        if (
+          errMsg.includes("Invalid root recomputed from proof") ||
+          errMsg.includes("Invalid root") ||
+          errMsg.includes("root recomputed")
+        ) {
+          throw new Error("This NFT appears to have been burned. The merkle proof is invalid because the NFT no longer exists in the tree.");
+        }
+        throw new Error(`Failed to get merkle proof: ${errMsg}`);
+      }
 
       if (!assetWithProof.proof || assetWithProof.proof.length === 0) {
-        throw new Error("No merkle proof available");
+        throw new Error("No merkle proof available. The NFT may have been burned or the merkle tree state may be invalid.");
       }
 
       // Debug: Log proof size
@@ -309,8 +357,138 @@ export function useFractionalize() {
 
       const versionedTx = new VersionedTransaction(messageV0);
 
-      // Sign transaction
-      const signedTx = await signTransaction!(versionedTx);
+      // Simulate transaction before signing to catch errors early (especially for burned NFTs)
+      try {
+        const simulationResult = await connectionForProvider.simulateTransaction(versionedTx, {
+          replaceRecentBlockhash: true,
+          sigVerify: false,
+        });
+
+        // Always check logs first, even if there's an error - logs contain the actual failure reason
+        if (simulationResult.value.logs && simulationResult.value.logs.length > 0) {
+          const logsString = simulationResult.value.logs.join(' ');
+          console.log("Simulation logs:", simulationResult.value.logs);
+          
+          // Check for burned NFT indicators in logs
+          if (
+            logsString.includes("Invalid root recomputed from proof") ||
+            logsString.includes("Error using concurrent merkle tree") ||
+            logsString.includes("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK")
+          ) {
+            throw new Error("This NFT appears to have been burned. The merkle proof is invalid because the NFT no longer exists in the tree. Please refresh the page to see updated NFT listings.");
+          }
+        }
+
+        // If there's an error, check it after checking logs
+        if (simulationResult.value.err) {
+          // Check if the error is related to burned NFT
+          const errorString = JSON.stringify(simulationResult.value.err);
+          console.log("Simulation error:", errorString);
+          
+          // Even with generic errors, if logs indicate burned NFT, we already threw above
+          // For other errors, check if instruction 2 (fractionalization instruction) failed
+          // which combined with the logs check above should catch most burned NFT cases
+          if (
+            errorString.includes("Invalid root recomputed from proof") ||
+            errorString.includes("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK") ||
+            errorString.includes("Error using concurrent merkle tree")
+          ) {
+            throw new Error("This NFT appears to have been burned. The merkle proof is invalid because the NFT no longer exists in the tree. Please refresh the page to see updated NFT listings.");
+          }
+          
+          // If instruction 2 failed and we have logs with merkle tree errors, it's likely a burned NFT
+          if (errorString.includes('"InstructionError":[2,') || errorString.includes('InstructionError') && errorString.includes('[2,')) {
+            // Check if we have logs (already checked above, but ensure we have them)
+            if (simulationResult.value.logs) {
+              const logsString = simulationResult.value.logs.join(' ');
+              // Double-check logs for burned NFT indicators even with generic instruction error
+              if (
+                logsString.includes("Invalid root recomputed") ||
+                logsString.includes("concurrent merkle tree") ||
+                logsString.includes("ReplaceLeaf")
+              ) {
+                throw new Error("This NFT appears to have been burned. The merkle proof is invalid because the NFT no longer exists in the tree. Please refresh the page to see updated NFT listings.");
+              }
+            }
+          }
+          
+          throw new Error(`Transaction simulation failed: ${errorString}`);
+        }
+      } catch (simErr: any) {
+        // If it's already our custom error, re-throw it
+        if (simErr.message && simErr.message.includes("burned")) {
+          throw simErr;
+        }
+        
+        // Check if the error has logs property (some error formats include logs)
+        if (simErr && typeof simErr === 'object') {
+          // Check for logs in various possible locations
+          const errorLogs = simErr.logs || simErr.simulationResponse?.logs || simErr.value?.logs || [];
+          if (Array.isArray(errorLogs) && errorLogs.length > 0) {
+            const logsString = errorLogs.join(' ');
+            if (
+              logsString.includes("Invalid root recomputed from proof") ||
+              logsString.includes("Error using concurrent merkle tree") ||
+              logsString.includes("Invalid root recomputed") ||
+              logsString.includes("ReplaceLeaf")
+            ) {
+              throw new Error("This NFT appears to have been burned. The merkle proof is invalid because the NFT no longer exists in the tree. Please refresh the page to see updated NFT listings.");
+            }
+          }
+        }
+        
+        // For other simulation errors, check the error message
+        const errMsg = simErr?.message || String(simErr);
+        const errString = JSON.stringify(simErr);
+        
+        // Check error message and stringified error
+        if (
+          errMsg.includes("Invalid root recomputed from proof") ||
+          errMsg.includes("Error using concurrent merkle tree") ||
+          errString.includes("Invalid root recomputed from proof") ||
+          errString.includes("Error using concurrent merkle tree") ||
+          errString.includes("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK")
+        ) {
+          throw new Error("This NFT appears to have been burned. The merkle proof is invalid because the NFT no longer exists in the tree. Please refresh the page to see updated NFT listings.");
+        }
+        
+        // If it's a generic ProgramFailedToComplete at instruction 2, it might be a burned NFT
+        // Instruction 2 is the fractionalization instruction which uses the merkle tree
+        if (errMsg.includes("ProgramFailedToComplete") || errString.includes("ProgramFailedToComplete")) {
+          // Check if instruction 2 failed (the fractionalization instruction that uses merkle proof)
+          const hasInstruction2Error = errString.includes('[2,') || 
+                                       errString.includes('"InstructionError":[2,') ||
+                                       (errString.includes('InstructionError') && errString.includes('[2,'));
+          
+          if (hasInstruction2Error) {
+            // Instruction 2 is the fractionalization instruction which uses merkle tree
+            // If it fails with ProgramFailedToComplete, it's very likely due to invalid merkle proof (burned NFT)
+            // We'll provide a helpful error message
+            throw new Error("Transaction simulation failed at the fractionalization step. This NFT may have been burned or the merkle proof is invalid. When an NFT is burned, the merkle tree root changes, making proofs invalid. Please refresh the page and ensure the NFT still exists before trying again.");
+          }
+        }
+        
+        // Re-throw other simulation errors with original message
+        throw new Error(`Transaction simulation failed: ${errMsg}`);
+      }
+
+      // Sign transaction - wallet might reject if simulation fails
+      let signedTx;
+      try {
+        signedTx = await signTransaction!(versionedTx);
+      } catch (signErr: any) {
+        // Wallet might reject transaction if its own simulation fails
+        const signErrMsg = signErr?.message || String(signErr);
+        if (
+          signErrMsg.includes("Invalid root recomputed from proof") ||
+          signErrMsg.includes("Error using concurrent merkle tree") ||
+          signErrMsg.includes("simulation") ||
+          signErrMsg.includes("Simulation failed")
+        ) {
+          throw new Error("This NFT appears to have been burned. The wallet rejected the transaction because the merkle proof is invalid. Please refresh the page to see updated NFT listings.");
+        }
+        throw signErr;
+      }
       
       // Send transaction
       const txSignature = await connectionForProvider.sendRawTransaction(signedTx.serialize());
@@ -324,15 +502,53 @@ export function useFractionalize() {
       setSignature(txSignature);
       return txSignature;
     } catch (err) {
-      console.error("Error fractionalizing cNFT:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to fractionalize cNFT";
-      setError(errorMessage);
+      // Parse error to detect burned NFTs first
+      let errorMessage = err instanceof Error ? err.message : "Failed to fractionalize cNFT";
+      let isBurnedNftError = false;
       
-      // Log additional error details if it's a SendTransactionError
+      // Check transaction logs for burned NFT indicators
       if (err && typeof err === 'object' && 'logs' in err) {
-        console.error("Transaction logs:", (err as any).logs);
+        const logs = (err as any).logs || [];
+        const logString = Array.isArray(logs) ? logs.join(' ') : String(logs);
+        
+        // Check for specific burned NFT errors in logs
+        if (
+          logString.includes("Invalid root recomputed from proof") ||
+          logString.includes("Error using concurrent merkle tree") ||
+          logString.includes("Invalid root recomputed")
+        ) {
+          errorMessage = "This NFT appears to have been burned. When an NFT is burned, the merkle tree root changes, making the proof invalid. Please refresh the page to see updated NFT listings.";
+          isBurnedNftError = true;
+        }
       }
       
+      // Also check the error message itself
+      if (
+        errorMessage.includes("Invalid root recomputed from proof") ||
+        errorMessage.includes("burned") ||
+        errorMessage.includes("no longer exists") ||
+        errorMessage.includes("may have been burned") ||
+        errorMessage.includes("merkle proof is invalid")
+      ) {
+        isBurnedNftError = true;
+      } else if (
+        errorMessage.includes("Program failed to complete") ||
+        errorMessage.includes("Simulation failed")
+      ) {
+        // Generic simulation failure - might be due to burned NFT
+        errorMessage = "Transaction simulation failed. This NFT may have been burned or is no longer valid. Please refresh the page and try again.";
+      }
+      
+      // Only log as error if it's not a burned NFT (user-facing error, not a system error)
+      if (!isBurnedNftError) {
+        console.error("Error fractionalizing cNFT:", err);
+        if (err && typeof err === 'object' && 'logs' in err) {
+          const logs = (err as any).logs || [];
+          console.error("Transaction logs:", logs);
+        }
+      }
+      
+      setError(errorMessage);
       throw err;
     } finally {
       setLoading(false);
