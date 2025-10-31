@@ -97,8 +97,6 @@ export default function FractionalizePage() {
                     key={selectedAssetId}
                     assetId={selectedAssetId}
                     onSuccess={async (signature) => {
-                      console.log("Fractionalization successful, signature:", signature);
-                      
                       // Add to action history
                       const newAction: ActionHistory = {
                         type: 'fractionalized',
