@@ -18,27 +18,32 @@ export default function ManualAssetInput() {
       // Try to add the asset by ID first (if it exists but isn't indexed in owner list)
       if (addAssetById) {
         console.log("Calling addAssetById...");
-        await addAssetById(assetId.trim());
-        console.log("addAssetById completed!");
-        // Don't refetch immediately - it might clear the manually added asset
-        // The asset should appear immediately due to state update
-        // We can refetch later if needed, but it won't clear manually added assets now
+        const result = await addAssetById(assetId.trim());
+        console.log("addAssetById completed with result:", result);
+        
+        if (result.success) {
+          // Show success message
+          const successMsg = "✅ Asset added successfully! It should appear in the gallery above.";
+          console.log(successMsg);
+          alert(successMsg);
+          setAssetId("");
+          setShowInput(false);
+        } else {
+          // Show error message
+          const errorMsg = result.error || "Failed to add asset. Please check the console for details.";
+          console.error("❌", errorMsg);
+          alert(`❌ ${errorMsg}`);
+        }
       } else {
         console.warn("addAssetById function not available, just refetching...");
         // Fallback to just refetching
         await refetch();
+        alert("⚠️ Manual add not available. Refreshing assets instead...");
       }
-      // Wait a moment to see if asset was added
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Show success message
-      const successMsg = "Asset added! Check if it appears in the gallery above.";
-      console.log("✅", successMsg);
-      
-      setAssetId("");
     } catch (err) {
       console.error("❌ Error adding asset:", err);
-      alert(`Error adding asset: ${err instanceof Error ? err.message : String(err)}`);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      alert(`❌ Error adding asset: ${errorMsg}`);
     } finally {
       setAdding(false);
     }
