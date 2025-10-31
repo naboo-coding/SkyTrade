@@ -64,8 +64,8 @@ export function useAssetById() {
           id: assetData.id,
           name: metadata.name || "Unnamed Asset",
           symbol: metadata.symbol,
-          uri: metadata.uri,
-          image: files[0]?.uri || metadata.uri,
+          uri: metadata.uri as string | undefined,
+          image: (files[0]?.uri || metadata.uri) as string | undefined,
           owner: assetData.ownership?.owner || "",
           compressed: assetData.compression?.compressed === true,
         };

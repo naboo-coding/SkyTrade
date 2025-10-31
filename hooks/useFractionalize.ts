@@ -11,6 +11,8 @@ import {
   ComputeBudgetProgram,
   Keypair,
   Connection,
+  AddressLookupTableProgram,
+  AddressLookupTableAccount,
 } from "@solana/web3.js";
 import {
   getAssociatedTokenAddressSync,
@@ -20,6 +22,7 @@ import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-ad
 import { mplBubblegum, getAssetWithProof } from "@metaplex-foundation/mpl-bubblegum";
 import { mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
 import { dasApi } from "@metaplex-foundation/digital-asset-standard-api";
+import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 import { PROGRAM_ID, MPL_BUBBLEGUM_ID, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID_V1, SPL_NOOP_PROGRAM_ID_V1, METAPLEX_PROGRAM_ID, PROTOCOL_PERCENT_FEE } from "@/constants";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
@@ -74,13 +77,17 @@ export function useFractionalize() {
 
       // 1. Fetch asset and proof
       const nftAssetId = params.assetId;
-      const assetWithProof = await getAssetWithProof(umi, publicKey(nftAssetId), {
+      const assetWithProof = await getAssetWithProof(umi, umiPublicKey(nftAssetId), {
         truncateCanopy: true,
       });
 
       if (!assetWithProof.proof || assetWithProof.proof.length === 0) {
         throw new Error("No merkle proof available");
       }
+
+      // Debug: Log proof size
+      console.log(`Proof size: ${assetWithProof.proof.length} nodes`);
+      console.log(`Proof accounts would add: ${assetWithProof.proof.length * 32} bytes to transaction`);
 
       // 2. Extract metadata
       const cNftName = assetWithProof.metadata.name;
@@ -118,7 +125,6 @@ export function useFractionalize() {
       );
       const program = new Program(
         FractionalizationIdl as any,
-        PROGRAM_ID,
         provider
       );
 
@@ -186,7 +192,7 @@ export function useFractionalize() {
           nftAsset: nftAssetIdWeb3,
           merkleTree: merkleTreeIdWeb3,
           treeAuthority: treeAuthority,
-          leafDelegate: leafDelegateWeb3,
+          ...(leafDelegateWeb3 && { leafDelegate: leafDelegateWeb3 }),
           compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID_V1,
           logWrapper: SPL_NOOP_PROGRAM_ID_V1,
           metadataAccount: metadataPda,
@@ -205,21 +211,114 @@ export function useFractionalize() {
         microLamports: 1,
       });
 
-      const messageV0 = new TransactionMessage({
+      // 13. Create Address Lookup Table to reduce transaction size
+      const slot = await connectionForProvider.getSlot();
+      const [createLookupTableIx, lookupTableAddress] =
+        AddressLookupTableProgram.createLookupTable({
+          authority: publicKey,
+          payer: publicKey,
+          recentSlot: slot - 1,
+        });
+
+      // Add all accounts to lookup table
+      const lookupTableAddresses = [
+        publicKey,
+        vaultPda,
+        mintAuthorityPda,
+        fractionMintPda,
+        metadataPda,
+        treasury,
+        nftAssetIdWeb3,
+        merkleTreeIdWeb3,
+        treeAuthority,
+        ...(leafDelegateWeb3 ? [leafDelegateWeb3] : []),
+        SPL_ACCOUNT_COMPRESSION_PROGRAM_ID_V1,
+        SPL_NOOP_PROGRAM_ID_V1,
+        ...proofAccounts.map(acc => acc.pubkey),
+      ];
+
+      const extendLookupTableIx = AddressLookupTableProgram.extendLookupTable({
+        payer: publicKey,
+        authority: publicKey,
+        lookupTable: lookupTableAddress,
+        addresses: lookupTableAddresses,
+      });
+
+      // Create lookup table first
+      const createLookupTableTx = new TransactionMessage({
         payerKey: publicKey,
         recentBlockhash: blockhash,
-        instructions: [computeBudgetIx, computePriceIx, fractionalizeIx],
+        instructions: [createLookupTableIx],
       }).compileToV0Message();
+
+      const createLookupTableVersionedTx = new VersionedTransaction(createLookupTableTx);
+      const signedCreateLookupTableTx = await signTransaction!(createLookupTableVersionedTx);
+      
+      const createLookupTableTxSignature = await connectionForProvider.sendRawTransaction(signedCreateLookupTableTx.serialize());
+      await connectionForProvider.confirmTransaction({
+        signature: createLookupTableTxSignature,
+        blockhash,
+        lastValidBlockHeight,
+      });
+
+      // Get fresh blockhash for extend transaction
+      const { blockhash: extendBlockhash, lastValidBlockHeight: extendLastValidBlockHeight } = 
+        await connectionForProvider.getLatestBlockhash();
+
+      // Then extend lookup table with all accounts
+      const extendLookupTableTx = new TransactionMessage({
+        payerKey: publicKey,
+        recentBlockhash: extendBlockhash,
+        instructions: [extendLookupTableIx],
+      }).compileToV0Message();
+
+      const extendLookupTableVersionedTx = new VersionedTransaction(extendLookupTableTx);
+      const signedExtendLookupTableTx = await signTransaction!(extendLookupTableVersionedTx);
+      
+      const extendLookupTableTxSignature = await connectionForProvider.sendRawTransaction(signedExtendLookupTableTx.serialize());
+      await connectionForProvider.confirmTransaction({
+        signature: extendLookupTableTxSignature,
+        blockhash: extendBlockhash,
+        lastValidBlockHeight: extendLastValidBlockHeight,
+      });
+
+      // Wait for lookup table to be activated and get fresh blockhash
+      // Wait a bit for the lookup table to be activated
+      let lookupTableAccount = await connectionForProvider.getAddressLookupTable(lookupTableAddress);
+      let retries = 0;
+      while (!lookupTableAccount && retries < 10) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        lookupTableAccount = await connectionForProvider.getAddressLookupTable(lookupTableAddress);
+        retries++;
+      }
+      
+      if (!lookupTableAccount) {
+        throw new Error("Failed to fetch lookup table");
+      }
+
+      // Get fresh blockhash for fractionalization transaction
+      const { blockhash: freshBlockhash, lastValidBlockHeight: freshLastValidBlockHeight } = 
+        await connectionForProvider.getLatestBlockhash();
+
+      // 14. Build fractionalization transaction using lookup table
+      const messageV0 = new TransactionMessage({
+        payerKey: publicKey,
+        recentBlockhash: freshBlockhash,
+        instructions: [computeBudgetIx, computePriceIx, fractionalizeIx],
+      }).compileToV0Message([lookupTableAccount.value]);
 
       const versionedTx = new VersionedTransaction(messageV0);
 
       // Sign transaction
-      const signedTx = await wallet.adapter.signTransaction!(versionedTx);
+      const signedTx = await signTransaction!(versionedTx);
+      
+      // Send transaction
       const txSignature = await connectionForProvider.sendRawTransaction(signedTx.serialize());
+      
       await connectionForProvider.confirmTransaction({
         signature: txSignature,
-        blockhash,
-        lastValidBlockHeight,
+        blockhash: freshBlockhash,
+        lastValidBlockHeight: freshLastValidBlockHeight,
       });
 
       setSignature(txSignature);
@@ -228,6 +327,12 @@ export function useFractionalize() {
       console.error("Error fractionalizing cNFT:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to fractionalize cNFT";
       setError(errorMessage);
+      
+      // Log additional error details if it's a SendTransactionError
+      if (err && typeof err === 'object' && 'logs' in err) {
+        console.error("Transaction logs:", (err as any).logs);
+      }
+      
       throw err;
     } finally {
       setLoading(false);

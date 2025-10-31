@@ -93,7 +93,7 @@ export function useCnftAssets() {
         return;
       }
 
-      // Log for debugging - CRITICAL: Check if endpoint matches expected network
+      // Log for debugging - Check if endpoint matches expected network
       const isDevnetEndpoint = endpoint.includes("devnet") || endpoint.includes("dev") || endpoint.includes("api.devnet");
       const isMainnetEndpoint = endpoint.includes("mainnet") || endpoint.includes("mainnet-beta");
       console.log("🌐 Network Check:", {
@@ -104,12 +104,6 @@ export function useCnftAssets() {
       });
       console.log("Creating UMI instance with endpoint:", isDevnetEndpoint ? "devnet" : (isMainnetEndpoint ? "mainnet" : "unknown"));
       console.log("Owner address being used:", ownerAddress);
-      
-      // WARN if mainnet endpoint detected but user likely has devnet assets
-      if (isMainnetEndpoint) {
-        console.error("⚠️⚠️⚠️ WARNING: Using MAINNET endpoint! If your cNFTs are on devnet, they won't appear!");
-        console.error("⚠️ Fix your .env.local to use: https://devnet.helius-rpc.com/?api-key=YOUR_KEY");
-      }
       
       // Final validation - throw error before API call if invalid
       if (!ownerAddress || ownerAddress === "undefined" || typeof ownerAddress !== "string" || ownerAddress.length < 32) {
@@ -189,8 +183,6 @@ export function useCnftAssets() {
         if (errorString.includes("403") || errorString.includes("access forbidden") || errorString.includes("forbidden") || fullError.includes('"code":403')) {
           const errorMsg = "Helius DAS API access forbidden. Please check your NEXT_PUBLIC_HELIUS_RPC_URL environment variable and ensure DAS API is enabled.";
           console.error("❌", errorMsg);
-          console.error("Current endpoint:", endpoint);
-          console.error("Environment variable check:", process.env.NEXT_PUBLIC_HELIUS_RPC_URL ? "Set" : "Not set");
           setError(errorMsg);
           // Preserve manually added assets even on auth errors
           setAssets((prev) => {
@@ -315,8 +307,8 @@ export function useCnftAssets() {
             id: asset.id,
             name: metadata.name || "Unnamed cNFT",
             symbol: metadata.symbol,
-            uri: metadata.uri,
-            image: files[0]?.uri || metadata.uri, // Try to get image from files or metadata
+            uri: metadata.uri as string | undefined,
+            image: (files[0]?.uri || metadata.uri) as string | undefined, // Try to get image from files or metadata
             owner: asset.ownership.owner,
           });
         } else {
@@ -516,20 +508,20 @@ export function useCnftAssets() {
       // Try to get image from multiple sources
       let imageUrl: string | undefined;
       if (files && files.length > 0) {
-        imageUrl = files[0]?.uri || files[0]?.cdn_uri;
+        imageUrl = (files[0]?.uri || files[0]?.cdn_uri) as string | undefined;
       }
       if (!imageUrl && metadata.image) {
-        imageUrl = metadata.image;
+        imageUrl = metadata.image as string;
       }
       if (!imageUrl && metadata.uri) {
-        imageUrl = metadata.uri;
+        imageUrl = metadata.uri as string;
       }
       
       const newAsset: CnftAsset = {
         id: assetData.id,
         name: metadata.name || assetData.id.slice(0, 8) || "Unnamed cNFT",
         symbol: metadata.symbol,
-        uri: metadata.uri,
+        uri: metadata.uri as string | undefined,
         image: imageUrl,
         owner: assetOwner || walletAddress || "",
       };
