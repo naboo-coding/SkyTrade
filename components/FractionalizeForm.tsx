@@ -77,19 +77,30 @@ export default function FractionalizeForm({
     return (
       <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
         <h3 className="text-base font-semibold text-green-800 dark:text-green-200 mb-1">
-          Successfully Fractionalized!
+          Successfully Fractionalized! 🎉
         </h3>
         <p className="text-xs text-green-700 dark:text-green-300 mb-2 break-all">
           Transaction signature: {signature}
         </p>
-        <a
-          href={`https://solscan.io/tx/${signature}?cluster=devnet`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          View on Solscan →
-        </a>
+        <div className="flex flex-col gap-2">
+          <a
+            href={`https://solscan.io/tx/${signature}?cluster=devnet`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            View on Solscan →
+          </a>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="text-sm px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+            >
+              Fractionalize Another NFT
+            </button>
+          )}
+        </div>
       </div>
     );
   }

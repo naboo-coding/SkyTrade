@@ -16,8 +16,8 @@ interface NetworkContextType {
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
 
 export function NetworkProvider({ children }: { children: React.ReactNode }) {
-  // Default to mainnet (main area), devnet is for testing
-  const [network, setNetworkState] = useState<Network>(WalletAdapterNetwork.Mainnet);
+  // Default to devnet for testing, mainnet is for production
+  const [network, setNetworkState] = useState<Network>(WalletAdapterNetwork.Devnet);
 
       // Get RPC endpoint - prefer Helius if available, fallback to public RPC
       const getEndpoint = useCallback((net: Network): string => {
@@ -58,7 +58,7 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
     }
   }, [getEndpoint]);
 
-  // Load network preference from localStorage on mount
+  // Load network preference from localStorage on mount, and auto-detect from Helius URL
   useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("solana-network") as Network | null;
@@ -66,6 +66,23 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
       if (saved && (saved === WalletAdapterNetwork.Devnet || saved === WalletAdapterNetwork.Mainnet)) {
         setNetworkState(saved);
         setEndpoint(getEndpoint(saved));
+      } else {
+        // No saved network, auto-detect from Helius URL if available
+        const heliusUrl = process.env.NEXT_PUBLIC_HELIUS_RPC_URL || "";
+        if (heliusUrl) {
+          const urlLower = heliusUrl.toLowerCase();
+          if (urlLower.includes("mainnet.helius-rpc.com") || urlLower.includes("mainnet.helius")) {
+            // Helius URL is for mainnet
+            console.log("🔄 Auto-detecting Mainnet from Helius URL");
+            setNetworkState(WalletAdapterNetwork.Mainnet);
+            setEndpoint(getEndpoint(WalletAdapterNetwork.Mainnet));
+          } else if (urlLower.includes("devnet.helius-rpc.com") || urlLower.includes("devnet.helius")) {
+            // Helius URL is for devnet
+            console.log("🔄 Auto-detecting Devnet from Helius URL");
+            setNetworkState(WalletAdapterNetwork.Devnet);
+            setEndpoint(getEndpoint(WalletAdapterNetwork.Devnet));
+          }
+        }
       }
     }
   }, [getEndpoint]);

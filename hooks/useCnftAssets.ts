@@ -25,12 +25,49 @@ export function useCnftAssets() {
   // Track manually added assets to prevent them from being cleared
   const manuallyAddedAssetIdsRef = useRef<Set<string>>(new Set());
   const [manuallyAddedAssetIds, setManuallyAddedAssetIds] = useState<Set<string>>(new Set());
+  // Store full manually added asset data so we can restore them during refetch
+  const manuallyAddedAssetsRef = useRef<Map<string, CnftAsset>>(new Map());
+  // Track deleted asset IDs to prevent them from reappearing after refresh
+  const deletedAssetIdsRef = useRef<Set<string>>(new Set());
+  const [deletedAssetIds, setDeletedAssetIds] = useState<Set<string>>(new Set());
+
+  // Load deleted asset IDs from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("deleted-nft-ids");
+        if (saved) {
+          const parsed = JSON.parse(saved) as string[];
+          const deletedSet = new Set(parsed);
+          deletedAssetIdsRef.current = deletedSet;
+          setDeletedAssetIds(deletedSet);
+          console.log(`Loaded ${deletedSet.size} deleted NFT IDs from localStorage`);
+        }
+      } catch (err) {
+        console.error("Failed to load deleted NFT IDs from localStorage:", err);
+      }
+    }
+  }, []);
+
+  // Save deleted asset IDs to localStorage whenever they change
+  const saveDeletedIdsToStorage = useCallback(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const idsArray = Array.from(deletedAssetIdsRef.current);
+        localStorage.setItem("deleted-nft-ids", JSON.stringify(idsArray));
+        console.log(`Saved ${idsArray.length} deleted NFT IDs to localStorage`);
+      } catch (err) {
+        console.error("Failed to save deleted NFT IDs to localStorage:", err);
+      }
+    }
+  }, []);
 
   const fetchAssets = useCallback(async () => {
     // Early return if wallet is not ready - check all conditions
     if (!publicKey || !wallet?.adapter || !endpoint) {
-      // Preserve manually added assets when wallet not connected
-      setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id)));
+      // Preserve manually added assets when wallet not connected (but filter deleted ones)
+      const deletedIds = deletedAssetIdsRef.current;
+      setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id)));
       setLoading(false);
       setError(null);
       return;
@@ -39,8 +76,9 @@ export function useCnftAssets() {
     // Capture publicKey value at the start to avoid stale closures
     const currentPublicKey = publicKey;
     if (!currentPublicKey) {
-      // Preserve manually added assets
-      setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id)));
+      // Preserve manually added assets (but filter deleted ones)
+      const deletedIds = deletedAssetIdsRef.current;
+      setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id)));
       setLoading(false);
       setError(null);
       return;
@@ -52,8 +90,9 @@ export function useCnftAssets() {
       ownerAddress = currentPublicKey.toBase58();
       if (!ownerAddress || ownerAddress.length === 0 || ownerAddress === "undefined") {
         console.warn("PublicKey.toBase58() returned invalid value:", ownerAddress);
-        // Preserve manually added assets
-        setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id)));
+        // Preserve manually added assets (but filter deleted ones)
+        const deletedIds = deletedAssetIdsRef.current;
+        setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id)));
         setLoading(false);
         setError(null);
         return;
@@ -62,16 +101,18 @@ export function useCnftAssets() {
       // Validate it looks like a valid Solana address (base58, ~44 chars)
       if (ownerAddress.length < 32 || ownerAddress.length > 44) {
         console.warn("Invalid address length:", ownerAddress.length);
-        // Preserve manually added assets
-        setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id)));
+        // Preserve manually added assets (but filter deleted ones)
+        const deletedIds = deletedAssetIdsRef.current;
+        setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id)));
         setLoading(false);
         setError(null);
         return;
       }
     } catch (err) {
       console.error("Error converting publicKey to string:", err);
-      // Preserve manually added assets
-      setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id)));
+      // Preserve manually added assets (but filter deleted ones)
+      const deletedIds = deletedAssetIdsRef.current;
+      setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id)));
       setLoading(false);
       setError(null);
       return;
@@ -79,13 +120,18 @@ export function useCnftAssets() {
 
     setLoading(true);
     setError(null);
+    
+    // CRITICAL: Don't clear assets during loading - preserve manually added ones
+    // This ensures manually added assets stay visible during refresh
+    console.log("🔄 Starting fetchAssets - preserving manually added assets during loading");
 
     try {
       // Double-check ownerAddress one more time before API call
       if (!ownerAddress || ownerAddress === "undefined" || ownerAddress.length === 0) {
         console.warn("Invalid ownerAddress before API call, aborting");
-        // Preserve manually added assets
-        setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id)));
+        // Preserve manually added assets (but filter deleted ones)
+        const deletedIds = deletedAssetIdsRef.current;
+        setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id)));
         setLoading(false);
         setError(null);
         return;
@@ -180,9 +226,10 @@ export function useCnftAssets() {
           const errorMsg = "Helius DAS API access forbidden. Please check your NEXT_PUBLIC_HELIUS_RPC_URL environment variable and ensure DAS API is enabled.";
           console.error("❌", errorMsg);
           setError(errorMsg);
-          // Preserve manually added assets even on auth errors
+          // Preserve manually added assets even on auth errors (but filter deleted ones)
+          const deletedIds = deletedAssetIdsRef.current;
           setAssets((prev) => {
-            const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id));
+            const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id));
             console.log(`Preserving ${manualAssets.length} manually added assets despite auth error`);
             return manualAssets;
           });
@@ -194,9 +241,10 @@ export function useCnftAssets() {
         // Don't catch other errors - let them bubble up so we can see what's really happening
         if (errorString.includes("no assets") && (errorString.includes("found") || errorString.includes("for owner"))) {
           console.warn("API returned 'no assets found' - treating as empty wallet");
-          // Preserve manually added assets even when API returns no assets
+          // Preserve manually added assets even when API returns no assets (but filter deleted ones)
+          const deletedIds = deletedAssetIdsRef.current;
           setAssets((prev) => {
-            const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id));
+            const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id));
             console.log(`Preserving ${manualAssets.length} manually added assets despite empty API response`);
             return manualAssets;
           });
@@ -205,11 +253,12 @@ export function useCnftAssets() {
           return;
         }
         
-        // For all other errors, log them but don't clear manually added assets
+        // For all other errors, log them but don't clear manually added assets (but filter deleted ones)
+        const deletedIds = deletedAssetIdsRef.current;
         console.error("❌ Unexpected API error - preserving manually added assets and showing error");
         setError(`API Error: ${apiErrorMsg}`);
         setAssets((prev) => {
-          const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id));
+          const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id));
           console.log(`Preserving ${manualAssets.length} manually added assets despite API error`);
           return manualAssets;
         });
@@ -220,8 +269,9 @@ export function useCnftAssets() {
       // Check if response is valid (not null/undefined)
       if (!response) {
         console.warn("⚠️ API returned null/undefined response");
+        const deletedIds = deletedAssetIdsRef.current;
         setAssets((prev) => {
-          const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id));
+          const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id));
           console.log(`Preserving ${manualAssets.length} manually added assets despite null response`);
           return manualAssets;
         });
@@ -326,20 +376,91 @@ export function useCnftAssets() {
       });
       
       setAssets((prevAssets) => {
-        // Keep manually added assets that aren't in API results
-        const manualAssets = prevAssets.filter(a => currentManualIds.has(a.id));
+        const currentDeletedIds = deletedAssetIdsRef.current;
+        
+        console.log("🔄 Merging assets - prevAssets count:", prevAssets.length);
+        console.log("🔄 Manual IDs in ref:", Array.from(currentManualIds).map(id => id.slice(0, 16) + "..."));
+        console.log("🔄 Stored manual assets in ref:", Array.from(manuallyAddedAssetsRef.current.keys()).map(id => id.slice(0, 16) + "..."));
+        console.log("🔄 Deleted IDs:", Array.from(currentDeletedIds).map(id => id.slice(0, 16) + "..."));
+        
+        // CRITICAL: Always get manually added assets from the ref first (source of truth)
+        // This ensures we have the latest data even if state hasn't updated yet
+        const allManualAssetsFromRef: CnftAsset[] = [];
+        currentManualIds.forEach(assetId => {
+          // Skip if deleted
+          if (currentDeletedIds.has(assetId)) {
+            console.log(`⊘ Skipping deleted manual asset: ${assetId.slice(0, 16)}...`);
+            return;
+          }
+          
+          const storedAsset = manuallyAddedAssetsRef.current.get(assetId);
+          if (storedAsset) {
+            allManualAssetsFromRef.push(storedAsset);
+            console.log(`✅ Including manually added asset from ref: ${assetId.slice(0, 16)}... (${storedAsset.name})`);
+          } else {
+            // If not in ref but in prevAssets, use that (fallback)
+            const fromState = prevAssets.find(a => a.id === assetId);
+            if (fromState) {
+              // Store it in ref for next time
+              manuallyAddedAssetsRef.current.set(assetId, fromState);
+              allManualAssetsFromRef.push(fromState);
+              console.log(`✅ Found manually added asset in state, storing in ref: ${assetId.slice(0, 16)}... (${fromState.name})`);
+            } else {
+              console.warn(`⚠️ Manual asset ID ${assetId.slice(0, 16)}... is tracked but not found in ref or state!`);
+            }
+          }
+        });
+        
+        // Use assets from ref as the source of truth for manually added assets
+        const allManualAssets = allManualAssetsFromRef;
+        
+        console.log(`✅ Total manually added assets to merge: ${allManualAssets.length}`);
+        
         console.log("🔍 Assets before merge:", {
           prevCount: prevAssets.length,
           prevIds: prevAssets.map(a => a.id.slice(0, 16) + "..."),
-          manualFromPrev: manualAssets.length,
-          manualIds: manualAssets.map(a => a.id.slice(0, 16) + "..."),
+          manualFromRef: allManualAssetsFromRef.length,
+          totalManual: allManualAssets.length,
+          manualIds: allManualAssets.map(a => a.id.slice(0, 16) + "..."),
+          manualIdsSet: Array.from(currentManualIds).map(id => id.slice(0, 16) + "..."),
           apiCount: cnfts.length,
-          apiIds: cnfts.map(a => a.id.slice(0, 16) + "...")
+          apiIds: cnfts.map(a => a.id.slice(0, 16) + "..."),
+          deletedCount: currentDeletedIds.size,
+          deletedIds: Array.from(currentDeletedIds).map(id => id.slice(0, 16) + "...")
         });
         
         // Combine manual assets with API results (avoid duplicates)
-        const merged = [...cnfts, ...manualAssets.filter(a => !cnfts.some(apiAsset => apiAsset.id === a.id))];
-        console.log(`✅ Merged ${merged.length} assets: ${cnfts.length} from API + ${manualAssets.length} manually added`);
+        const mergedBeforeFilter = [...cnfts, ...allManualAssets.filter(a => !cnfts.some(apiAsset => apiAsset.id === a.id))];
+        
+        // IMPORTANT: Filter out deleted assets, BUT preserve manually added ones that were re-added
+        // If an asset is manually added (in currentManualIds), we should check if it was recently re-added
+        // by checking if it's in deleted list - if it's manually added, we trust the manual addition
+        // and remove it from deleted list if needed (defensive check)
+        const merged = mergedBeforeFilter.filter(a => {
+          const isDeleted = currentDeletedIds.has(a.id);
+          const isManuallyAdded = currentManualIds.has(a.id);
+          
+          // If it's manually added, it should NOT be filtered out (user explicitly added it)
+          if (isManuallyAdded && isDeleted) {
+            console.warn(`⚠️ Asset ${a.id.slice(0, 16)}... is both manually added AND in deleted list. Removing from deleted list.`);
+            // Defensive: remove from deleted list if it's manually added
+            deletedAssetIdsRef.current.delete(a.id);
+            const newDeletedSet = new Set(deletedAssetIdsRef.current);
+            setDeletedAssetIds(newDeletedSet);
+            saveDeletedIdsToStorage();
+            return true; // Include it
+          }
+          
+          // Otherwise, filter out deleted assets
+          return !isDeleted;
+        });
+        
+        const filteredCount = mergedBeforeFilter.length - merged.length;
+        if (filteredCount > 0) {
+          console.log(`🚫 Filtered out ${filteredCount} deleted asset(s) from merged results`);
+        }
+        
+        console.log(`✅ Merged ${merged.length} assets: ${cnfts.length} from API + ${allManualAssets.length} manually added (${filteredCount} deleted)`);
         console.log("✅ Final merged asset IDs:", merged.map(a => a.id.slice(0, 16) + "..."));
         console.log("✅ Manual asset IDs that should be preserved:", Array.from(currentManualIds));
         return merged;
@@ -358,18 +479,20 @@ export function useCnftAssets() {
         errorString.includes("invalid owner")
       ) {
         console.log("Expected empty state or connection issue, suppressing error");
-        // Preserve manually added assets even when there's an error
+        // Preserve manually added assets even when there's an error (but filter deleted ones)
+        const deletedIds = deletedAssetIdsRef.current;
         setAssets((prev) => {
-          const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id));
+          const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id));
           console.log(`Preserving ${manualAssets.length} manually added assets despite error`);
           return manualAssets;
         });
         setError(null); // Clear error for expected empty state
       } else {
         console.error("Unexpected error fetching cNFT assets:", err);
-        // Preserve manually added assets even on unexpected errors
+        // Preserve manually added assets even on unexpected errors (but filter deleted ones)
+        const deletedIds = deletedAssetIdsRef.current;
         setAssets((prev) => {
-          const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id));
+          const manualAssets = prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id));
           console.log(`Preserving ${manualAssets.length} manually added assets despite unexpected error`);
           return manualAssets;
         });
@@ -378,7 +501,7 @@ export function useCnftAssets() {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, wallet, endpoint]);
+  }, [publicKey, wallet, endpoint, saveDeletedIdsToStorage]);
 
   useEffect(() => {
     // Only fetch if we have a valid publicKey
@@ -527,35 +650,89 @@ export function useCnftAssets() {
         owner: newAsset.owner?.slice(0, 8) + "..."
       });
 
+      // CRITICAL: ALWAYS remove from deleted list FIRST when user manually adds it back
+      // This ensures it won't be filtered out by fetchAssets or any other operation
+      const wasDeleted = deletedAssetIdsRef.current.has(newAsset.id);
+      console.log(`🔍 Checking if asset ${newAsset.id.slice(0, 16)}... was deleted:`, wasDeleted);
+      
+      if (wasDeleted) {
+        deletedAssetIdsRef.current.delete(newAsset.id);
+        const newDeletedSet = new Set(deletedAssetIdsRef.current);
+        setDeletedAssetIds(newDeletedSet);
+        saveDeletedIdsToStorage();
+        console.log(`✅ Removed ${newAsset.id.slice(0, 16)}... from deleted list - allowing re-addition`);
+        console.log(`✅ Deleted list now contains ${deletedAssetIdsRef.current.size} items`);
+        console.log(`✅ Verification: Asset still in deleted list? ${deletedAssetIdsRef.current.has(newAsset.id)}`);
+      }
+
       // Mark as manually added BEFORE updating state to ensure it's tracked
       manuallyAddedAssetIdsRef.current.add(newAsset.id);
+      // Store the full asset data so we can restore it during refetch
+      manuallyAddedAssetsRef.current.set(newAsset.id, newAsset);
       const newManualSet = new Set(manuallyAddedAssetIdsRef.current);
       setManuallyAddedAssetIds(newManualSet);
       console.log("📌 Marked asset as manually added BEFORE state update. Total manual assets:", manuallyAddedAssetIdsRef.current.size);
+      console.log("📌 Stored full asset data for manual asset:", newAsset.id.slice(0, 16) + "...");
       console.log("📌 Manual asset IDs ref:", Array.from(manuallyAddedAssetIdsRef.current));
       
       // Use functional update to ensure we get the latest state
+      // IMPORTANT: This update happens AFTER we've already removed from deleted list
       setAssets((prev) => {
+        // First, filter out any assets that are currently in the deleted list (shouldn't include newAsset now)
+        const currentDeletedIds = deletedAssetIdsRef.current;
+        const prevFiltered = prev.filter(a => !currentDeletedIds.has(a.id));
+        
         console.log("🔍 Current assets BEFORE add:", {
-          count: prev.length,
-          ids: prev.map(a => a.id.slice(0, 16) + "..."),
-          manualAssetIds: Array.from(manuallyAddedAssetIdsRef.current)
+          prevCount: prev.length,
+          prevIds: prev.map(a => a.id.slice(0, 16) + "..."),
+          filteredCount: prevFiltered.length,
+          filteredIds: prevFiltered.map(a => a.id.slice(0, 16) + "..."),
+          manualAssetIds: Array.from(manuallyAddedAssetIdsRef.current),
+          wasDeleted,
+          newAssetId: newAsset.id.slice(0, 16) + "...",
+          isNewAssetInDeletedList: currentDeletedIds.has(newAsset.id)
         });
         
-        // Don't add if already exists
-        if (prev.some(a => a.id === newAsset.id)) {
-          console.log("⚠️ Asset already in list:", newAsset.id);
-          return prev; // Return unchanged if already exists
+        // Verify the new asset is NOT in the deleted list
+        if (currentDeletedIds.has(newAsset.id)) {
+          console.error(`❌ ERROR: New asset ${newAsset.id.slice(0, 16)}... is still in deleted list! This should not happen.`);
+          // Force remove it again
+          console.log("🔧 Force removing from deleted list...");
+          deletedAssetIdsRef.current.delete(newAsset.id);
+          const forceDeletedSet = new Set(deletedAssetIdsRef.current);
+          setDeletedAssetIds(forceDeletedSet);
+          saveDeletedIdsToStorage();
         }
         
-        console.log("✅ Adding asset to gallery! New count will be:", prev.length + 1);
-        const updated = [...prev, newAsset];
+        // Check if asset already exists in the filtered state
+        const existingIndex = prevFiltered.findIndex(a => a.id === newAsset.id);
+        if (existingIndex !== -1) {
+          // If it exists, replace it with fresh data
+          console.log(`✅ Asset exists, replacing with fresh data: ${newAsset.id.slice(0, 16)}...`);
+          const updated = [...prevFiltered];
+          updated[existingIndex] = newAsset; // Replace with fresh data
+          console.log("✅ Replaced existing asset:", {
+            count: updated.length,
+            ids: updated.map(a => a.id.slice(0, 16) + "...")
+          });
+          return updated;
+        }
+        
+        // Asset doesn't exist yet, add it
+        console.log("✅ Adding new asset to gallery! New count will be:", prevFiltered.length + 1);
+        const updated = [...prevFiltered, newAsset];
         console.log("✅ Updated assets array AFTER add:", {
           count: updated.length,
           ids: updated.map(a => a.id.slice(0, 16) + "..."),
           names: updated.map(a => a.name),
-          manualAssetIds: Array.from(manuallyAddedAssetIdsRef.current)
+          manualAssetIds: Array.from(manuallyAddedAssetIdsRef.current),
+          newAssetId: newAsset.id.slice(0, 16) + "...",
+          newAssetName: newAsset.name
         });
+        
+        // Final verification: ensure newAsset is in the result
+        const containsNewAsset = updated.some(a => a.id === newAsset.id);
+        console.log(`✅ Final verification - newAsset is in result: ${containsNewAsset}`);
         
         return updated;
       });
@@ -583,7 +760,35 @@ export function useCnftAssets() {
       
       return { success: false, error: userError };
     }
-  }, [wallet, endpoint, publicKey]);
+  }, [wallet, endpoint, publicKey, saveDeletedIdsToStorage]);
 
-  return { assets, loading, error, refetch: fetchAssets, addAssetById };
+  // Function to manually remove an asset from the gallery
+  const removeAsset = useCallback((assetId: string) => {
+    // Add to deleted set to prevent it from reappearing after refresh
+    deletedAssetIdsRef.current.add(assetId);
+    const newDeletedSet = new Set(deletedAssetIdsRef.current);
+    setDeletedAssetIds(newDeletedSet);
+    
+    // Save to localStorage
+    saveDeletedIdsToStorage();
+    
+    setAssets((prev) => {
+      const updated = prev.filter(a => a.id !== assetId);
+      console.log(`Removed asset ${assetId.slice(0, 16)}... from gallery. Remaining: ${updated.length}`);
+      console.log(`Asset ${assetId.slice(0, 16)}... marked as deleted and will not reappear after refresh`);
+      
+      // Also remove from manually added assets if it was manually added
+      if (manuallyAddedAssetIdsRef.current.has(assetId)) {
+        manuallyAddedAssetIdsRef.current.delete(assetId);
+        manuallyAddedAssetsRef.current.delete(assetId); // Also remove from stored data
+        const newManualSet = new Set(manuallyAddedAssetIdsRef.current);
+        setManuallyAddedAssetIds(newManualSet);
+        console.log(`Removed ${assetId.slice(0, 16)}... from manually added assets and stored data`);
+      }
+      
+      return updated;
+    });
+  }, [saveDeletedIdsToStorage]);
+
+  return { assets, loading, error, refetch: fetchAssets, addAssetById, removeAsset };
 }

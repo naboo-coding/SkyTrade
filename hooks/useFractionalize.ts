@@ -312,12 +312,13 @@ export function useFractionalize() {
       
       // Handle different return types from signTransaction
       let serializedCreateTx: Uint8Array;
-      if (signedCreateLookupTableTx instanceof VersionedTransaction) {
-        serializedCreateTx = signedCreateLookupTableTx.serialize();
-      } else if (signedCreateLookupTableTx instanceof Uint8Array || signedCreateLookupTableTx instanceof Buffer) {
-        serializedCreateTx = signedCreateLookupTableTx;
-      } else if (typeof (signedCreateLookupTableTx as any)?.serialize === 'function') {
-        serializedCreateTx = (signedCreateLookupTableTx as any).serialize();
+      const signedTxAny = signedCreateLookupTableTx as any;
+      if (signedTxAny instanceof VersionedTransaction) {
+        serializedCreateTx = signedTxAny.serialize();
+      } else if (signedTxAny instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(signedTxAny))) {
+        serializedCreateTx = signedTxAny;
+      } else if (typeof signedTxAny?.serialize === 'function') {
+        serializedCreateTx = signedTxAny.serialize();
       } else {
         console.error("Unknown signedCreateLookupTableTx type:", typeof signedCreateLookupTableTx);
         throw new Error(`Unable to serialize create lookup table transaction. Received type: ${typeof signedCreateLookupTableTx}`);
@@ -346,12 +347,13 @@ export function useFractionalize() {
       
       // Handle different return types from signTransaction
       let serializedExtendTx: Uint8Array;
-      if (signedExtendLookupTableTx instanceof VersionedTransaction) {
-        serializedExtendTx = signedExtendLookupTableTx.serialize();
-      } else if (signedExtendLookupTableTx instanceof Uint8Array || signedExtendLookupTableTx instanceof Buffer) {
-        serializedExtendTx = signedExtendLookupTableTx;
-      } else if (typeof (signedExtendLookupTableTx as any)?.serialize === 'function') {
-        serializedExtendTx = (signedExtendLookupTableTx as any).serialize();
+      const signedExtendTxAny = signedExtendLookupTableTx as any;
+      if (signedExtendTxAny instanceof VersionedTransaction) {
+        serializedExtendTx = signedExtendTxAny.serialize();
+      } else if (signedExtendTxAny instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(signedExtendTxAny))) {
+        serializedExtendTx = signedExtendTxAny;
+      } else if (typeof signedExtendTxAny?.serialize === 'function') {
+        serializedExtendTx = signedExtendTxAny.serialize();
       } else {
         console.error("Unknown signedExtendLookupTableTx type:", typeof signedExtendLookupTableTx);
         throw new Error(`Unable to serialize extend lookup table transaction. Received type: ${typeof signedExtendLookupTableTx}`);
@@ -374,7 +376,7 @@ export function useFractionalize() {
         retries++;
       }
       
-      if (!lookupTableAccount) {
+      if (!lookupTableAccount || !lookupTableAccount.value) {
         throw new Error("Failed to fetch lookup table");
       }
 
@@ -504,13 +506,14 @@ export function useFractionalize() {
       // Handle different return types from signTransaction
       // Some wallets return VersionedTransaction, others return Uint8Array
       let serializedTx: Uint8Array;
-      if (signedTx instanceof VersionedTransaction) {
-        serializedTx = signedTx.serialize();
-      } else if (signedTx instanceof Uint8Array || signedTx instanceof Buffer) {
-        serializedTx = signedTx;
-      } else if (typeof (signedTx as any)?.serialize === 'function') {
+      const signedTxAny2 = signedTx as any;
+      if (signedTxAny2 instanceof VersionedTransaction) {
+        serializedTx = signedTxAny2.serialize();
+      } else if (signedTxAny2 instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(signedTxAny2))) {
+        serializedTx = signedTxAny2;
+      } else if (typeof signedTxAny2?.serialize === 'function') {
         // Try to call serialize method if it exists
-        serializedTx = (signedTx as any).serialize();
+        serializedTx = signedTxAny2.serialize();
       } else {
         // Last resort: try to convert to Uint8Array
         console.error("Unknown signedTx type:", typeof signedTx, signedTx);
