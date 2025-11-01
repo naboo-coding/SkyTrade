@@ -26,4 +26,65 @@ body {
   }
 }
 
+/* Subtle Apple-like shimmer effect on text letters */
+@keyframes shimmer-gradient {
+  0% {
+    background-position: -150% center;
+  }
+  100% {
+    background-position: 150% center;
+  }
+}
+
+@keyframes ambient-glow {
+  0%, 100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(1.05);
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #64748B 0%,
+    #64748B 30%,
+    rgba(255, 255, 255, 0.9) 45%,
+    #ffffff 50%,
+    rgba(255, 255, 255, 0.9) 55%,
+    #64748B 70%,
+    #64748B 100%
+  );
+  background-size: 300% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer-gradient 6s ease-in-out infinite;
+  color: transparent;
+}
+
+.shimmer-text-dark {
+  background: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    #ffffff 30%,
+    rgba(255, 255, 255, 0.6) 45%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.6) 55%,
+    #ffffff 70%,
+    #ffffff 100%
+  );
+  background-size: 300% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer-gradient 6s ease-in-out infinite;
+  color: transparent;
+}
+
 
