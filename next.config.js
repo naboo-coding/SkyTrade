@@ -1,5 +1,4 @@
 const webpack = require('webpack');
-const path = require('path');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -16,20 +15,20 @@ const nextConfig = {
       type: 'javascript/auto',
     });
     
-    // Use NormalModuleReplacementPlugin to replace the missing file
-    config.plugins.push(
-      new webpack.NormalModuleReplacementPlugin(
-        /^\.\/createWeb3JsRpc\.mjs$/,
-        (resource) => {
-          if (resource.context.includes('@metaplex-foundation/umi-rpc-web3js')) {
-            resource.request = path.resolve(
-              resource.context,
-              '../src/createWeb3JsRpc.ts'
-            );
-          }
-        }
-      )
-    );
+    // Allow transpiling .ts files from node_modules/umi-rpc-web3js
+    config.module.rules.push({
+      test: /\.ts$/,
+      include: /node_modules\/@metaplex-foundation\/umi-rpc-web3js/,
+      use: [
+        {
+          loader: 'next/dist/compiled/babel/loader',
+          options: {
+            presets: ['next/babel'],
+            cacheDirectory: true,
+          },
+        },
+      ],
+    });
     
     if (!isServer) {
       config.resolve.fallback = {
