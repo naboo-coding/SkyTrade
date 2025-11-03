@@ -165,24 +165,43 @@ export default function MintCnftButton() {
                   onChange={handleFileChange}
                   className="w-full text-sm text-gray-500 dark:text-gray-400"
                 />
+                {formData.imageUrl && formData.imageUrl.length > 100 && !formData.pinataJwt && (
+                  <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
+                    ⚠️ Long image URLs may require Pinata JWT. If you get a "URI too long" error, please provide a Pinata JWT.
+                  </p>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Pinata JWT (Optional - for IPFS upload)
+                  Pinata JWT (Recommended for long URLs)
                 </label>
                 <input
                   type="password"
                   value={formData.pinataJwt}
                   onChange={(e) => setFormData({ ...formData, pinataJwt: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="Leave empty if using image URL"
+                  placeholder="Leave empty if using short image URL"
                 />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Required if image URL is longer than ~100 characters. Uploads metadata to IPFS for shorter URIs.
+                </p>
               </div>
 
               {error && (
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
                   <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                </div>
+              )}
+
+              {!error && !assetId && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    <strong>ℹ️ Note:</strong> Minting requires <strong>2 wallet approvals</strong>:
+                    <br />1. Create collection and merkle tree
+                    <br />2. Mint cNFT
+                    <br />This is normal and required for the minting process.
+                  </p>
                 </div>
               )}
 

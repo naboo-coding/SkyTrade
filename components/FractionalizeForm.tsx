@@ -233,6 +233,17 @@ export default function FractionalizeForm({
         </div>
       )}
 
+      {!error && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+          <p className="text-xs text-blue-800 dark:text-blue-200">
+            <strong>ℹ️ Note:</strong> This process requires <strong>2 wallet approvals</strong>:
+            <br />1. Create and extend lookup table
+            <br />2. Fractionalize transaction
+            <br />This is normal and required for the fractionalization process.
+          </p>
+        </div>
+      )}
+
       <div className="flex space-x-3 pt-4">
         <button
           type="submit"

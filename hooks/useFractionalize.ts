@@ -25,6 +25,7 @@ import { useNetwork } from "@/contexts/NetworkContext";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import FractionalizationIdl from "../fractionalization.json";
 import * as anchor from "@coral-xyz/anchor";
+import { parseUserFriendlyError } from "@/utils/errorParser";
 
 interface FractionalizeParams {
   assetId: string; // cNFT Asset ID
@@ -264,7 +265,8 @@ export function useFractionalize() {
         microLamports: 1,
       });
 
-      // 13. Create Address Lookup Table to reduce transaction size
+      // 13. Create and extend Address Lookup Table in a single transaction to reduce wallet approvals
+      // This combines create + extend into one transaction (reduces from 3 approvals to 2)
       const slot = await connectionForProvider.getSlot();
       const [createLookupTableIx, lookupTableAddress] =
         AddressLookupTableProgram.createLookupTable({
@@ -297,70 +299,35 @@ export function useFractionalize() {
         addresses: lookupTableAddresses,
       });
 
-      // Create lookup table first
-      const createLookupTableTx = new TransactionMessage({
+      // Combine create + extend into a single transaction
+      const createAndExtendLookupTableTx = new TransactionMessage({
         payerKey: publicKey,
         recentBlockhash: blockhash,
-        instructions: [createLookupTableIx],
+        instructions: [createLookupTableIx, extendLookupTableIx],
       }).compileToV0Message();
 
-      const createLookupTableVersionedTx = new VersionedTransaction(createLookupTableTx);
-      const signedCreateLookupTableTx = await signTransaction!(createLookupTableVersionedTx);
+      const createAndExtendVersionedTx = new VersionedTransaction(createAndExtendLookupTableTx);
+      const signedCreateAndExtendTx = await signTransaction!(createAndExtendVersionedTx);
       
       // Handle different return types from signTransaction
-      let serializedCreateTx: Uint8Array;
-      const signedTxAny = signedCreateLookupTableTx as any;
+      let serializedCreateAndExtendTx: Uint8Array;
+      const signedTxAny = signedCreateAndExtendTx as any;
       if (signedTxAny instanceof VersionedTransaction) {
-        serializedCreateTx = signedTxAny.serialize();
+        serializedCreateAndExtendTx = signedTxAny.serialize();
       } else if (signedTxAny instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(signedTxAny))) {
-        serializedCreateTx = signedTxAny;
+        serializedCreateAndExtendTx = signedTxAny;
       } else if (typeof signedTxAny?.serialize === 'function') {
-        serializedCreateTx = signedTxAny.serialize();
+        serializedCreateAndExtendTx = signedTxAny.serialize();
       } else {
-        console.error("Unknown signedCreateLookupTableTx type:", typeof signedCreateLookupTableTx);
-        throw new Error(`Unable to serialize create lookup table transaction. Received type: ${typeof signedCreateLookupTableTx}`);
+        console.error("Unknown signedCreateAndExtendTx type:", typeof signedCreateAndExtendTx);
+        throw new Error(`Unable to serialize create and extend lookup table transaction. Received type: ${typeof signedCreateAndExtendTx}`);
       }
       
-      const createLookupTableTxSignature = await connectionForProvider.sendRawTransaction(serializedCreateTx);
+      const createAndExtendTxSignature = await connectionForProvider.sendRawTransaction(serializedCreateAndExtendTx);
       await connectionForProvider.confirmTransaction({
-        signature: createLookupTableTxSignature,
+        signature: createAndExtendTxSignature,
         blockhash,
         lastValidBlockHeight,
-      });
-
-      // Get fresh blockhash for extend transaction
-      const { blockhash: extendBlockhash, lastValidBlockHeight: extendLastValidBlockHeight } = 
-        await connectionForProvider.getLatestBlockhash();
-
-      // Then extend lookup table with all accounts
-      const extendLookupTableTx = new TransactionMessage({
-        payerKey: publicKey,
-        recentBlockhash: extendBlockhash,
-        instructions: [extendLookupTableIx],
-      }).compileToV0Message();
-
-      const extendLookupTableVersionedTx = new VersionedTransaction(extendLookupTableTx);
-      const signedExtendLookupTableTx = await signTransaction!(extendLookupTableVersionedTx);
-      
-      // Handle different return types from signTransaction
-      let serializedExtendTx: Uint8Array;
-      const signedExtendTxAny = signedExtendLookupTableTx as any;
-      if (signedExtendTxAny instanceof VersionedTransaction) {
-        serializedExtendTx = signedExtendTxAny.serialize();
-      } else if (signedExtendTxAny instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(signedExtendTxAny))) {
-        serializedExtendTx = signedExtendTxAny;
-      } else if (typeof signedExtendTxAny?.serialize === 'function') {
-        serializedExtendTx = signedExtendTxAny.serialize();
-      } else {
-        console.error("Unknown signedExtendLookupTableTx type:", typeof signedExtendLookupTableTx);
-        throw new Error(`Unable to serialize extend lookup table transaction. Received type: ${typeof signedExtendLookupTableTx}`);
-      }
-      
-      const extendLookupTableTxSignature = await connectionForProvider.sendRawTransaction(serializedExtendTx);
-      await connectionForProvider.confirmTransaction({
-        signature: extendLookupTableTxSignature,
-        blockhash: extendBlockhash,
-        lastValidBlockHeight: extendLastValidBlockHeight,
       });
 
       // Wait for lookup table to be activated and get fresh blockhash
@@ -526,8 +493,8 @@ export function useFractionalize() {
       setSignature(txSignature);
       return txSignature;
     } catch (err) {
-      // Parse error to detect burned NFTs first
-      let errorMessage = err instanceof Error ? err.message : "Failed to fractionalize cNFT";
+      // Check for burned NFT errors first (these need special handling)
+      let errorMessage: string;
       let isBurnedNftError = false;
       
       // Check transaction logs for burned NFT indicators
@@ -546,24 +513,22 @@ export function useFractionalize() {
         }
       }
       
-      // Also check the error message itself - be more specific about burned NFTs
-      // Only mark as burned if we have a specific "Invalid root recomputed from proof" error
-      // Don't mark generic errors as burned NFTs
-      if (
-        errorMessage.includes("Invalid root recomputed from proof") &&
-        !errorMessage.includes("wait") &&
-        !errorMessage.includes("indexed")
-      ) {
-        isBurnedNftError = true;
-      } else if (
-        errorMessage.includes("Program failed to complete") ||
-        errorMessage.includes("Simulation failed")
-      ) {
-        // Generic simulation failure - don't assume it's a burned NFT
-        // Could be various issues including indexing delays
-        if (!errorMessage.includes("wait") && !errorMessage.includes("indexed")) {
-          errorMessage = "Transaction simulation failed. Please check the console for details. If you just minted this NFT, wait 30-60 seconds for indexing.";
+      // Also check the error message itself for burned NFT errors
+      if (!isBurnedNftError) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        if (
+          errorMsg.includes("Invalid root recomputed from proof") &&
+          !errorMsg.includes("wait") &&
+          !errorMsg.includes("indexed")
+        ) {
+          errorMessage = "This NFT appears to have been burned. When an NFT is burned, the merkle tree root changes, making the proof invalid. Please refresh the page to see updated NFT listings.";
+          isBurnedNftError = true;
         }
+      }
+      
+      // If not a burned NFT error, use the user-friendly error parser
+      if (!isBurnedNftError) {
+        errorMessage = parseUserFriendlyError(err);
       }
       
       // Only log as error if it's not a burned NFT (user-facing error, not a system error)

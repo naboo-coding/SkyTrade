@@ -5,10 +5,11 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import umiWithCurrentWalletAdapter from "@/lib/umi/umiWithCurrentWalletAdapter";
 import { createTree, mintToCollectionV1, findLeafAssetIdPda, TokenStandard } from "@metaplex-foundation/mpl-bubblegum";
 import { createNft } from "@metaplex-foundation/mpl-token-metadata";
-import { generateSigner, publicKey, percentAmount } from "@metaplex-foundation/umi";
+import { generateSigner, publicKey, percentAmount, TransactionBuilder } from "@metaplex-foundation/umi";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { uploadImageToPinata as uploadImageUtil, uploadMetadataToPinata as uploadMetadataUtil } from "@/utils/uploadToPinata";
+import { parseUserFriendlyError } from "@/utils/errorParser";
 
 interface MintCnftParams {
   imageFile?: File;
@@ -74,40 +75,64 @@ export function useMintCnft() {
       const symbol = params.symbol || "DP";
       let metadataUrl: string;
       
+      // Metaplex Bubblegum has a URI length limit of ~200 characters
+      // Check if the image URL would create a URI that's too long
+      const testMetadataUrl = `https://example.com/metadata.json?name=${encodeURIComponent(name)}&symbol=${encodeURIComponent(symbol)}&image=${encodeURIComponent(imageUrl)}`;
+      const MAX_URI_LENGTH = 200;
+      
       if (params.pinataJwt) {
         metadataUrl = await uploadMetadataToPinataHook(name, symbol, imageUrl, params.pinataJwt);
+        
+        // Validate the Pinata URL is also not too long
+        if (metadataUrl.length > MAX_URI_LENGTH) {
+          throw new Error(`Metadata URI is too long (${metadataUrl.length} characters). The maximum allowed length is ${MAX_URI_LENGTH} characters. Please use a shorter image URL or contact support.`);
+        }
       } else {
-        // Use a default metadata URL if Pinata is not available
-        metadataUrl = `https://example.com/metadata.json?name=${encodeURIComponent(name)}&symbol=${encodeURIComponent(symbol)}&image=${encodeURIComponent(imageUrl)}`;
+        // Check if the constructed URL would exceed the limit
+        if (testMetadataUrl.length > MAX_URI_LENGTH) {
+          throw new Error(
+            `Image URL is too long to create a valid metadata URI (would be ${testMetadataUrl.length} characters, max is ${MAX_URI_LENGTH}). ` +
+            `Please provide a Pinata JWT to upload to IPFS, or use a shorter image URL (under ${Math.max(0, MAX_URI_LENGTH - 100)} characters).`
+          );
+        }
+        // Use a default metadata URL if Pinata is not available and URL is short enough
+        metadataUrl = testMetadataUrl;
       }
 
-      // 3. Create collection
+      // 3. Create collection and merkle tree in a single transaction to reduce wallet approvals
       const collectionMint = generateSigner(umi);
-      await createNft(umi, {
+      const merkleTree = generateSigner(umi);
+      
+      // Build both transactions
+      const collectionBuilder = createNft(umi, {
         mint: collectionMint,
         name: "My Collection V1",
         symbol: "COL_V1",
         uri: "https://example.com/collection.json",
         isCollection: true,
         sellerFeeBasisPoints: percentAmount(5.5),
-      }).sendAndConfirm(umi);
+      });
 
-      // 4. Create Merkle tree
-      const merkleTree = generateSigner(umi);
-      const builder = await createTree(umi, {
+      const treeBuilder = await createTree(umi, {
         merkleTree,
         maxDepth: 14,
         maxBufferSize: 64,
         canopyDepth: 8,
       });
 
-      await builder.sendAndConfirm(umi, {
+      // Combine both builders into a single transaction
+      const combinedBuilder = new TransactionBuilder()
+        .add(collectionBuilder)
+        .add(treeBuilder);
+
+      // Send and confirm the combined transaction
+      await combinedBuilder.sendAndConfirm(umi, {
         confirm: {
           commitment: "finalized",
         },
       });
 
-      // 5. Mint cNFT
+      // 4. Mint cNFT (separate transaction as it depends on collection and tree)
       // Ensure we're using the connected wallet's public key as the owner
       const ownerPublicKey = umi.payer.publicKey;
       
@@ -155,7 +180,7 @@ export function useMintCnft() {
       return assetIdPda.toString();
     } catch (err) {
       console.error("Error minting cNFT:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to mint cNFT";
+      const errorMessage = parseUserFriendlyError(err);
       setError(errorMessage);
       throw err;
     } finally {
