@@ -10,6 +10,7 @@ import { useNetwork } from "@/contexts/NetworkContext";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { uploadImageToPinata as uploadImageUtil, uploadMetadataToPinata as uploadMetadataUtil } from "@/utils/uploadToPinata";
 import { parseUserFriendlyError } from "@/utils/errorParser";
+import useUmiStore from "@/store/useUmiStore";
 
 interface MintCnftParams {
   imageFile?: File;
@@ -23,6 +24,7 @@ export function useMintCnft() {
   const { publicKey, wallet, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { endpoint, network } = useNetwork();
+  const { updateRpcUrl } = useUmiStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
@@ -53,11 +55,19 @@ export function useMintCnft() {
       // Ensure endpoint is explicitly devnet if we're on devnet
       // WalletAdapterNetwork.Devnet is the constant value "devnet"
       const isDevnet = network === WalletAdapterNetwork.Devnet;
-      const devnetEndpoint = isDevnet 
+      const correctEndpoint = isDevnet 
         ? (endpoint.includes("devnet") || endpoint.includes("dev") || endpoint.includes("api.devnet")
            ? endpoint 
            : "https://api.devnet.solana.com")
         : endpoint;
+      
+      // Update UMI store with the correct endpoint before using it
+      // This ensures the UMI instance uses the correct network
+      // Check if we need to update (Zustand updates are synchronous)
+      const currentRpcUrl = useUmiStore.getState().rpcUrl;
+      if (currentRpcUrl !== correctEndpoint) {
+        updateRpcUrl(correctEndpoint);
+      }
       
       const umi = umiWithCurrentWalletAdapter();
 
@@ -186,7 +196,7 @@ export function useMintCnft() {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, wallet, endpoint, network, uploadImageToPinataHook, uploadMetadataToPinataHook]);
+  }, [publicKey, wallet, endpoint, network, updateRpcUrl, uploadImageToPinataHook, uploadMetadataToPinataHook]);
 
   return { mintCnft, loading, error, assetId };
 }

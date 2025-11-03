@@ -494,7 +494,6 @@ export function useFractionalize() {
       return txSignature;
     } catch (err) {
       // Check for burned NFT errors first (these need special handling)
-      let errorMessage: string;
       let isBurnedNftError = false;
       
       // Check transaction logs for burned NFT indicators
@@ -508,7 +507,6 @@ export function useFractionalize() {
           logString.includes("Error using concurrent merkle tree") ||
           logString.includes("Invalid root recomputed")
         ) {
-          errorMessage = "This NFT appears to have been burned. When an NFT is burned, the merkle tree root changes, making the proof invalid. Please refresh the page to see updated NFT listings.";
           isBurnedNftError = true;
         }
       }
@@ -521,15 +519,14 @@ export function useFractionalize() {
           !errorMsg.includes("wait") &&
           !errorMsg.includes("indexed")
         ) {
-          errorMessage = "This NFT appears to have been burned. When an NFT is burned, the merkle tree root changes, making the proof invalid. Please refresh the page to see updated NFT listings.";
           isBurnedNftError = true;
         }
       }
       
-      // If not a burned NFT error, use the user-friendly error parser
-      if (!isBurnedNftError) {
-        errorMessage = parseUserFriendlyError(err);
-      }
+      // Determine error message - always assign a value
+      const errorMessage = isBurnedNftError
+        ? "This NFT appears to have been burned. When an NFT is burned, the merkle tree root changes, making the proof invalid. Please refresh the page to see updated NFT listings."
+        : parseUserFriendlyError(err);
       
       // Only log as error if it's not a burned NFT (user-facing error, not a system error)
       if (!isBurnedNftError) {
