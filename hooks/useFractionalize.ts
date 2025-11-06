@@ -40,7 +40,7 @@ export function useFractionalize() {
   const [error, setError] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
 
-  const fractionalize = useCallback(async (params: FractionalizeParams) => {
+  const fractionalize = useCallback(async (params: FractionalizeParams): Promise<string | undefined> => {
     if (!publicKey || !wallet?.adapter) {
       throw new Error("Wallet not connected");
     }
@@ -69,12 +69,11 @@ export function useFractionalize() {
         assetData = await umi.rpc.getAsset(umiPublicKey(nftAssetId));
       } catch (fetchErr: any) {
         const errMsg = fetchErr?.message || String(fetchErr);
-        console.error("Error fetching asset:", errMsg);
         
         if (errMsg.includes("not found") || errMsg.includes("404")) {
           throw new Error("NFT not found. If you just minted this NFT, please wait 30-60 seconds for Helius DAS API to index it before trying to fractionalize.");
         }
-        throw new Error(`Failed to fetch NFT: ${errMsg}`);
+        throw new Error(parseUserFriendlyError(fetchErr));
       }
 
       // Check if asset exists and has valid ownership
@@ -107,8 +106,6 @@ export function useFractionalize() {
         });
       } catch (proofErr: any) {
         const errMsg = proofErr?.message || String(proofErr);
-        console.error("Error fetching merkle proof:", errMsg);
-        console.error("Full proof error:", proofErr);
         
         // Only check for burned NFT if we have a very specific error message
         // "Invalid root recomputed from proof" specifically indicates the NFT was burned
@@ -127,8 +124,8 @@ export function useFractionalize() {
           throw new Error("Unable to fetch merkle proof. If you just minted this NFT, please wait 30-60 seconds for it to be fully indexed before trying to fractionalize.");
         }
         
-        // Generic error with more context
-        throw new Error(`Failed to get merkle proof: ${errMsg}. If you just minted this NFT, it may need more time to be indexed. Please wait 30-60 seconds and try again.`);
+        // Use error parser for user-friendly message
+        throw new Error(parseUserFriendlyError(proofErr));
       }
 
       if (!assetWithProof.proof || assetWithProof.proof.length === 0) {
@@ -291,15 +288,26 @@ export function useFractionalize() {
           // Check if the error is related to burned NFT
           const errorString = JSON.stringify(simulationResult.value.err);
           
+          // Check for transaction size errors first
+          if (
+            errorString.includes("too large") ||
+            errorString.includes("VersionedTransaction too large") ||
+            errorString.includes("max: encoded/raw")
+          ) {
+            throw new Error("The transaction is too large to process. This can happen with very deep merkle trees. Please try again later or contact support if the issue persists.");
+          }
+          
           // Only check for the EXACT burned NFT error - be very specific
           // "Invalid root recomputed from proof" is the definitive indicator of a burned NFT
           if (errorString.includes("Invalid root recomputed from proof")) {
             throw new Error("This NFT appears to have been burned. The merkle proof is invalid because the NFT no longer exists in the tree. Please refresh the page to see updated NFT listings.");
           }
           
-          // For other errors, provide helpful context but don't assume it's burned
-          console.error("Transaction simulation failed. Error details:", errorString);
-          console.error("Full simulation result:", simulationResult);
+          // For other errors, log technical details only in development
+          if (process.env.NODE_ENV === 'development') {
+            console.error("Transaction simulation failed. Error details:", errorString);
+            console.error("Full simulation result:", simulationResult);
+          }
           
           // Check if it's instruction 2 (fractionalization) that failed
           if (errorString.includes('"InstructionError":[2,') || (errorString.includes('InstructionError') && errorString.includes('[2,'))) {
@@ -311,16 +319,30 @@ export function useFractionalize() {
                 throw new Error("This NFT appears to have been burned. The merkle proof is invalid because the NFT no longer exists in the tree. Please refresh the page to see updated NFT listings.");
               }
             }
-            // Otherwise, it's likely a different issue (compute budget, account issues, etc.)
-            throw new Error(`Fractionalization instruction failed. Please check the console for details. Error: ${errorString.substring(0, 200)}`);
+            // Otherwise, use error parser for user-friendly message
+            throw new Error(parseUserFriendlyError(simulationResult.value.err));
           }
           
-          throw new Error(`Transaction simulation failed: ${errorString.substring(0, 200)}. Please check the console for full error details.`);
+          // Use error parser for user-friendly message
+          throw new Error(parseUserFriendlyError(simulationResult.value.err));
         }
       } catch (simErr: any) {
         // If it's already our custom error, re-throw it
         if (simErr.message && simErr.message.includes("burned")) {
           throw simErr;
+        }
+        
+        // Check for transaction size errors first
+        const errMsg = simErr?.message || String(simErr);
+        const errString = JSON.stringify(simErr);
+        
+        if (
+          errMsg.includes("too large") ||
+          errMsg.includes("VersionedTransaction too large") ||
+          errString.includes("too large") ||
+          errString.includes("max: encoded/raw")
+        ) {
+          throw new Error("The transaction is too large to process. This can happen with very deep merkle trees. Please try again later or contact support if the issue persists.");
         }
         
         // Check if the error has logs property (some error formats include logs)
@@ -336,10 +358,6 @@ export function useFractionalize() {
           }
         }
         
-        // For other simulation errors, check the error message
-        const errMsg = simErr?.message || String(simErr);
-        const errString = JSON.stringify(simErr);
-        
         // Only check for the EXACT burned NFT error - be very specific
         if (
           errMsg.includes("Invalid root recomputed from proof") ||
@@ -348,12 +366,14 @@ export function useFractionalize() {
           throw new Error("This NFT appears to have been burned. The merkle proof is invalid because the NFT no longer exists in the tree. Please refresh the page to see updated NFT listings.");
         }
         
-        // For other errors, log them and provide helpful context
-        console.error("Transaction simulation error (not a burned NFT):", errMsg);
-        console.error("Full error:", simErr);
+        // For other errors, use the error parser to get user-friendly message
+        // Log technical details only in development
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Transaction simulation error:", errMsg);
+        }
         
-        // Re-throw with helpful context but don't assume it's a burned NFT
-        throw new Error(`Transaction simulation failed: ${errMsg.substring(0, 300)}. Please check the console for full details.`);
+        // Re-throw with user-friendly message
+        throw new Error(parseUserFriendlyError(simErr));
       }
 
       // Sign transaction - wallet might reject if simulation fails
@@ -438,17 +458,23 @@ export function useFractionalize() {
         ? "This NFT appears to have been burned. When an NFT is burned, the merkle tree root changes, making the proof invalid. Please refresh the page to see updated NFT listings."
         : parseUserFriendlyError(err);
       
-      // Only log as error if it's not a burned NFT (user-facing error, not a system error)
-      if (!isBurnedNftError) {
-        console.error("Error fractionalizing cNFT:", err);
+      // Only log technical details in development mode (but don't log the full stack trace)
+      if (process.env.NODE_ENV === 'development' && !isBurnedNftError) {
+        // Log a simple message without the full error object to avoid stack traces
+        console.warn("Fractionalization error:", errorMessage);
         if (err && typeof err === 'object' && 'logs' in err) {
           const logs = (err as any).logs || [];
-          console.error("Transaction logs:", logs);
+          if (logs.length > 0) {
+            console.warn("Transaction logs:", logs);
+          }
         }
       }
       
       setError(errorMessage);
-      throw err;
+      // Don't re-throw - we've handled the error and set the state
+      // The component will show the error via the error state
+      // Return undefined to indicate failure (signature will be null)
+      return undefined as any;
     } finally {
       setLoading(false);
     }

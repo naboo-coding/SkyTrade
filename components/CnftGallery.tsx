@@ -15,7 +15,7 @@ export interface CnftGalleryRef {
 }
 
 const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGallery({ onSelectAsset, selectedAssetId }, ref) {
-  const { assets, loading, error, refetch, removeAsset } = useCnftAssets();
+  const { assets, loading, error, refetch } = useCnftAssets();
   
   useImperativeHandle(ref, () => ({
     refetch: async () => {
@@ -26,8 +26,6 @@ const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGa
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [imageFallbacks, setImageFallbacks] = useState<Map<string, string[]>>(new Map());
   const [currentImageIndex, setCurrentImageIndex] = useState<Map<string, number>>(new Map());
-  const [deleteMode, setDeleteMode] = useState(false);
-  const [assetsToDelete, setAssetsToDelete] = useState<Set<string>>(new Set());
   const [displayCount, setDisplayCount] = useState(10);
 
   const handleImageError = (assetId: string, imageUrl: string) => {
@@ -149,46 +147,12 @@ const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGa
     );
   }
 
-  const handleDeleteClick = () => {
-    if (deleteMode && assetsToDelete.size > 0) {
-      // Execute deletion
-      assetsToDelete.forEach(assetId => {
-        removeAsset(assetId);
-      });
-      setAssetsToDelete(new Set());
-      setDeleteMode(false);
-    } else if (deleteMode) {
-      // Cancel delete mode
-      setDeleteMode(false);
-      setAssetsToDelete(new Set());
-    } else {
-      // Enter delete mode
-      setDeleteMode(true);
-    }
-  };
-
-  const toggleAssetSelection = (assetId: string) => {
-    setAssetsToDelete(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(assetId)) {
-        newSet.delete(assetId);
-      } else {
-        newSet.add(assetId);
-      }
-      return newSet;
-    });
-  };
 
   return (
     <div className="w-full">
       <div className="mb-4 flex justify-between items-center">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
           Your cNFTs ({assets.length})
-          {deleteMode && (
-            <span className="text-sm text-orange-600 dark:text-orange-400 ml-2">
-              ({assetsToDelete.size} selected)
-            </span>
-          )}
         </h2>
         <div className="flex gap-2">
           <button
@@ -196,26 +160,6 @@ const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGa
             className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
           >
             Refresh
-          </button>
-          <button
-            onClick={handleDeleteClick}
-            className={`px-4 py-2 text-sm rounded transition-colors ${
-              deleteMode
-                ? assetsToDelete.size > 0
-                  ? "bg-red-600 hover:bg-red-700 text-white"
-                  : "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-800"
-                : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800"
-            }`}
-          >
-            {deleteMode ? (
-              assetsToDelete.size > 0 ? (
-                `Delete ${assetsToDelete.size} NFT${assetsToDelete.size > 1 ? 's' : ''}`
-              ) : (
-                "Cancel"
-              )
-            ) : (
-              "Delete NFTs"
-            )}
           </button>
         </div>
       </div>
@@ -228,35 +172,14 @@ const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGa
           <div
             key={asset.id}
             onClick={() => {
-              if (deleteMode) {
-                toggleAssetSelection(asset.id);
-              } else {
-                onSelectAsset(asset.id);
-              }
+              onSelectAsset(asset.id);
             }}
             className={`relative cursor-pointer border-2 rounded-lg overflow-hidden transition-all ${
-              deleteMode
-                ? assetsToDelete.has(asset.id)
-                  ? "border-red-500 ring-2 ring-red-200 dark:ring-red-800"
-                  : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                : selectedAssetId === asset.id
-                  ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
-                  : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+              selectedAssetId === asset.id
+                ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
+                : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
             }`}
           >
-            {/* Selection indicator in delete mode */}
-            {deleteMode && assetsToDelete.has(asset.id) && (
-              <div className="absolute top-2 right-2 z-10 bg-red-500 text-white rounded-full p-1.5 shadow-lg">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-            )}
-            {/* Delete mode overlay */}
-            {deleteMode && !assetsToDelete.has(asset.id) && (
-              <div className="absolute top-2 right-2 z-10 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-full w-7 h-7 flex items-center justify-center shadow-lg">
-              </div>
-            )}
             <div>
               <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center relative">
                 {!imageErrors.has(asset.id) && getImageUrl(asset) ? (

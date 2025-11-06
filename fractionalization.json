@@ -8,6 +8,755 @@
   },
   "instructions": [
     {
+      "name": "cancel_reclaim_v1",
+      "discriminator": [
+        222,
+        82,
+        90,
+        102,
+        159,
+        37,
+        25,
+        198
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "nft_asset_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fraction_mint"
+        },
+        {
+          "name": "user_fractioned_token_account",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "address": "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
+        },
+        {
+          "name": "user_usdc_account",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "Treasury wallet - receives cancellation fee"
+          ]
+        },
+        {
+          "name": "treasury_usdc_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "treasury"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "compensation_escrow_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  101,
+                  110,
+                  115,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "compensation_escrow_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fraction_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nft_asset_id",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "finalize_reclaim_v1",
+      "discriminator": [
+        150,
+        78,
+        171,
+        122,
+        90,
+        81,
+        155,
+        113
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "nft_asset_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fraction_mint",
+          "writable": true
+        },
+        {
+          "name": "user_fractioned_token_account",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "address": "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
+        },
+        {
+          "name": "user_usdc_account",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "Treasury wallet - receives Reclaim fee"
+          ]
+        },
+        {
+          "name": "treasury_usdc_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "treasury"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "compensation_escrow_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  101,
+                  110,
+                  115,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "compensation_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "compensation_escrow_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_escrow",
+          "docs": [
+            "Token escrow ATA holding the locked fractions (authority = compensation_escrow_authority PDA)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "compensation_escrow_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fraction_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "raydium_pool"
+        },
+        {
+          "name": "observation_state"
+        },
+        {
+          "name": "bubblegum_program",
+          "address": "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
+        },
+        {
+          "name": "compression_program"
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true
+        },
+        {
+          "name": "tree_authority",
+          "writable": true
+        },
+        {
+          "name": "leaf_delegate",
+          "optional": true
+        },
+        {
+          "name": "log_wrapper"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nft_asset_id",
+          "type": "pubkey"
+        },
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "data_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "creator_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": "u64"
+        },
+        {
+          "name": "index",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "fractionalize_v1",
       "discriminator": [
         182,
@@ -444,6 +1193,256 @@
           "type": "string"
         }
       ]
+    },
+    {
+      "name": "initialize_reclaim_v1",
+      "discriminator": [
+        28,
+        52,
+        96,
+        248,
+        184,
+        88,
+        184,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "nft_asset_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fraction_mint",
+          "writable": true
+        },
+        {
+          "name": "user_fractioned_token_account",
+          "writable": true
+        },
+        {
+          "name": "compensation_escrow_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  109,
+                  112,
+                  101,
+                  110,
+                  115,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "compensation_escrow_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "fraction_mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "bubblegum_program",
+          "address": "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
+        },
+        {
+          "name": "compression_program"
+        },
+        {
+          "name": "merkle_tree",
+          "writable": true
+        },
+        {
+          "name": "tree_authority",
+          "writable": true
+        },
+        {
+          "name": "leaf_delegate",
+          "optional": true
+        },
+        {
+          "name": "log_wrapper"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "nft_asset_id",
+          "type": "pubkey"
+        },
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "data_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "creator_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": "u64"
+        },
+        {
+          "name": "index",
+          "type": "u32"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -489,16 +1488,42 @@
       ]
     },
     {
-      "name": "Reclaimed",
+      "name": "ReclaimCancelled",
       "discriminator": [
-        230,
-        25,
-        32,
-        135,
-        40,
-        167,
-        137,
-        130
+        45,
+        203,
+        73,
+        253,
+        128,
+        134,
+        73,
+        127
+      ]
+    },
+    {
+      "name": "ReclaimFinalized",
+      "discriminator": [
+        17,
+        84,
+        50,
+        82,
+        75,
+        38,
+        173,
+        48
+      ]
+    },
+    {
+      "name": "ReclaimInitiated",
+      "discriminator": [
+        209,
+        100,
+        81,
+        69,
+        121,
+        12,
+        154,
+        251
       ]
     },
     {
@@ -546,63 +1571,153 @@
     },
     {
       "code": 6003,
+      "name": "InsufficientUsdcForCompensation",
+      "msg": "The user has NOT enough USDC for compensation"
+    },
+    {
+      "code": 6004,
       "name": "InvalidPool",
       "msg": "Invalid Raydium pool (wrong program or mints)"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "WrongMint",
       "msg": "Pool mint mismatch"
     },
     {
-      "code": 6005,
+      "code": 6006,
+      "name": "InvalidPoolOwner",
+      "msg": "Pool account is not owned by Raydium CP-Swap program"
+    },
+    {
+      "code": 6007,
       "name": "VaultNotReclaimed",
       "msg": "Vault is not reclaimed"
     },
     {
-      "code": 6006,
+      "code": 6008,
       "name": "NoTokensToRedeem",
       "msg": "No tokens to redeem"
     },
     {
-      "code": 6007,
+      "code": 6009,
       "name": "MathOverflow",
       "msg": "Math overflow"
     },
     {
-      "code": 6008,
+      "code": 6010,
       "name": "SupplyMismatch",
       "msg": "Supply Mismatch"
     },
     {
-      "code": 6009,
+      "code": 6011,
       "name": "Unauthorized",
       "msg": "Unauthorized"
     },
     {
-      "code": 6010,
+      "code": 6012,
       "name": "InvalidSupply",
       "msg": "Invalid supply"
     },
     {
-      "code": 6011,
+      "code": 6013,
       "name": "EscrowNotEmpty",
       "msg": "Escrow still holds USDC"
     },
     {
-      "code": 6012,
+      "code": 6014,
       "name": "InvalidFractionTokenAccount",
       "msg": "Token-account mint does not match expected fraction mint"
     },
     {
-      "code": 6013,
+      "code": 6015,
       "name": "InvalidUsdcTokenAccount",
       "msg": "USDC token-account mint does not match expected USDC mint"
     },
     {
-      "code": 6014,
+      "code": 6016,
       "name": "InvalidOwner",
       "msg": "Token-account owner does not match signer"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidPoolAccountSize",
+      "msg": "Pool account size too small"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidObservationAccountSize",
+      "msg": "Observation account size too small"
+    },
+    {
+      "code": 6019,
+      "name": "InvalidPoolData",
+      "msg": "Failed to deserialize pool data"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidObservationData",
+      "msg": "Failed to deserialize observation data"
+    },
+    {
+      "code": 6021,
+      "name": "TwapWindowTooShort",
+      "msg": "On-chain TWAP window shorter than required minimum"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidPoolTokens",
+      "msg": "Invalid tokens in the Pool"
+    },
+    {
+      "code": 6023,
+      "name": "InvalidNftAssetId",
+      "msg": "The provided nft_asset_id does not match the vault's stored asset ID"
+    },
+    {
+      "code": 6024,
+      "name": "InsufficientTwapData",
+      "msg": "Not enough observation for twap calculations"
+    },
+    {
+      "code": 6025,
+      "name": "VaultNotInReclaimInitiated",
+      "msg": "Vault is not in ReclaimInitiated status"
+    },
+    {
+      "code": 6026,
+      "name": "EscrowPeriodNotEnded",
+      "msg": "Escrow period has not ended yet"
+    },
+    {
+      "code": 6027,
+      "name": "UnauthorizedFinalizer",
+      "msg": "Only the original reclaim initiator can finalize"
+    },
+    {
+      "code": 6028,
+      "name": "UnauthorizedCancellation",
+      "msg": "Only the original reclaim initiator can cancel"
+    },
+    {
+      "code": 6029,
+      "name": "InsufficientUsdcForCancellationFee",
+      "msg": "Insufficient USDC balance to pay cancellation fee (100 USDC required)"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidTreasuryAccount",
+      "msg": "Invalid Treasury Account"
+    },
+    {
+      "code": 6031,
+      "name": "PercentageFeeTooHigh",
+      "msg": "Percentage Fee can NOT be above 100%"
+    },
+    {
+      "code": 6032,
+      "name": "InsufficientUsdcForReclaimFeeAndCompensation",
+      "msg": "Insuficient USDC balance to pay both Reclaim Fee and Compensation"
     }
   ],
   "types": [
@@ -699,7 +1814,35 @@
       }
     },
     {
-      "name": "Reclaimed",
+      "name": "ReclaimCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "initiator",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokens_returned",
+            "type": "u64"
+          },
+          {
+            "name": "cancellation_fee_paid",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReclaimFinalized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -726,6 +1869,42 @@
           {
             "name": "minority_tokens",
             "type": "u64"
+          },
+          {
+            "name": "is_direct_reclaim",
+            "type": "bool"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReclaimInitiated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "initiator",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokens_locked",
+            "type": "u64"
+          },
+          {
+            "name": "minority_tokens",
+            "type": "u64"
+          },
+          {
+            "name": "escrow_ends_at",
+            "type": "i64"
           },
           {
             "name": "timestamp",
@@ -838,6 +2017,18 @@
           {
             "name": "min_volume_percent_30d",
             "type": "u8"
+          },
+          {
+            "name": "reclaim_initiator",
+            "type": "pubkey"
+          },
+          {
+            "name": "reclaim_initiation_timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "tokens_in_escrow",
+            "type": "u64"
           }
         ]
       }
@@ -867,7 +2058,10 @@
             "name": "Active"
           },
           {
-            "name": "Reclaimed"
+            "name": "ReclaimInitiated"
+          },
+          {
+            "name": "ReclaimedFinalized"
           },
           {
             "name": "Closed"

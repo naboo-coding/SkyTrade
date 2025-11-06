@@ -60,15 +60,46 @@ export function useAssetById() {
         }
         
         // If no image from files, try to fetch from metadata URI
+        // Skip placeholder/invalid URLs to avoid CORS errors
         if (!imageUrl && metadata.uri) {
-          try {
-            const metadataResponse = await fetch(metadata.uri as string);
-            if (metadataResponse.ok) {
-              const metadataJson = await metadataResponse.json();
-              imageUrl = metadataJson.image || metadataJson.image_url || metadataJson.imageUrl;
+          const isValidUrl = (url: string): boolean => {
+            try {
+              const urlObj = new URL(url);
+              // Skip placeholder domains
+              const invalidDomains = ['example.com', 'example.org', 'localhost', '127.0.0.1'];
+              const hostname = urlObj.hostname.toLowerCase();
+              if (invalidDomains.some(domain => hostname.includes(domain))) {
+                return false;
+              }
+              // Must be http or https
+              return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+            } catch {
+              return false;
             }
-          } catch (err) {
-            console.warn(`Failed to fetch metadata from ${metadata.uri}:`, err);
+          };
+
+          if (isValidUrl(metadata.uri as string)) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
+            try {
+              const metadataResponse = await fetch(metadata.uri as string, {
+                mode: 'cors',
+                signal: controller.signal,
+              });
+              clearTimeout(timeoutId);
+              
+              if (metadataResponse.ok) {
+                const metadataJson = await metadataResponse.json();
+                imageUrl = metadataJson.image || metadataJson.image_url || metadataJson.imageUrl;
+              }
+            } catch (err: any) {
+              clearTimeout(timeoutId);
+              // Silently fail - skip CORS, network, and abort errors
+              if (err?.name === 'AbortError' || err?.name === 'TypeError' || err?.message?.includes('CORS')) {
+                // Expected errors, don't log
+              }
+            }
           }
         }
         

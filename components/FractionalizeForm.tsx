@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useFractionalize } from "@/hooks/useFractionalize";
 import { useToast } from "@/components/ToastContainer";
+import ErrorModal from "@/components/ErrorModal";
 
 interface FractionalizeFormProps {
   assetId: string;
@@ -17,6 +18,8 @@ export default function FractionalizeForm({
 }: FractionalizeFormProps) {
   const { fractionalize, loading, error, signature } = useFractionalize();
   const { showToast } = useToast();
+  const [errorModalOpen, setErrorModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   // Reset form state when assetId changes (when user selects a different NFT)
   // The component will remount with a new key, which resets all hook state including signature
@@ -64,10 +67,19 @@ export default function FractionalizeForm({
         showToast(`Fractionalization successful! Signature: ${signature.slice(0, 8)}...`, "success");
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      showToast(`Fractionalization failed: ${errorMsg}`, "error");
+      // Error is already handled in the hook and set in error state
+      // Just show the modal with the error message from the hook
+      // Don't log or re-throw to avoid stack traces
     }
   };
+
+  // Show error modal when error state changes
+  useEffect(() => {
+    if (error) {
+      setErrorMessage(error);
+      setErrorModalOpen(true);
+    }
+  }, [error]);
 
   if (signature) {
     return (
@@ -102,7 +114,17 @@ export default function FractionalizeForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <>
+      <ErrorModal
+        isOpen={errorModalOpen}
+        message={errorMessage}
+        onClose={() => {
+          setErrorModalOpen(false);
+          setErrorMessage("");
+        }}
+        title="Fractionalization Failed"
+      />
+      <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label
           htmlFor="totalSupply"
@@ -234,5 +256,6 @@ export default function FractionalizeForm({
         )}
       </div>
     </form>
+    </>
   );
 }

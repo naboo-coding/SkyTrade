@@ -218,11 +218,11 @@ export function useMintCnft() {
         throw new Error(`Metadata URI is too long (${metadataUrl.length} characters). The maximum allowed length is ${MAX_URI_LENGTH} characters.`);
       }
 
-      // 3. Create collection and merkle tree in a single transaction to reduce wallet approvals
+      // 3. Create collection, merkle tree, and mint cNFT in a single transaction
       const collectionMint = generateSigner(umi);
       const merkleTree = generateSigner(umi);
       
-      // Build both transactions
+      // Build all three operations
       const collectionBuilder = createNft(umi, {
         mint: collectionMint,
         name: "My Collection V1",
@@ -239,23 +239,10 @@ export function useMintCnft() {
         canopyDepth: 8,
       });
 
-      // Combine both builders into a single transaction
-      const combinedBuilder = new TransactionBuilder()
-        .add(collectionBuilder)
-        .add(treeBuilder);
-
-      // Send and confirm the combined transaction
-      await combinedBuilder.sendAndConfirm(umi, {
-        confirm: {
-          commitment: "finalized",
-        },
-      });
-
-      // 4. Mint cNFT (separate transaction as it depends on collection and tree)
       // Ensure we're using the connected wallet's public key as the owner
       const ownerPublicKey = umi.payer.publicKey;
       
-      await mintToCollectionV1(umi, {
+      const mintBuilder = mintToCollectionV1(umi, {
         leafOwner: ownerPublicKey,
         merkleTree: merkleTree.publicKey,
         collectionMint: collectionMint.publicKey,
@@ -277,7 +264,16 @@ export function useMintCnft() {
           },
           tokenStandard: TokenStandard.NonFungible,
         },
-      }).sendAndConfirm(umi, {
+      });
+
+      // Combine all three builders into a single transaction
+      const combinedBuilder = new TransactionBuilder()
+        .add(collectionBuilder)
+        .add(treeBuilder)
+        .add(mintBuilder);
+
+      // Send and confirm the combined transaction (single wallet approval)
+      await combinedBuilder.sendAndConfirm(umi, {
         confirm: {
           commitment: "finalized",
         },

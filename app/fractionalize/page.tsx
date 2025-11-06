@@ -74,7 +74,7 @@ export default function FractionalizePage() {
                   Network: {networkName}
                 </p>
               </div>
-              <MintCnftButton />
+              <MintCnftButton galleryRef={galleryRef} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

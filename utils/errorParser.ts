@@ -6,8 +6,12 @@ export function parseUserFriendlyError(error: any): string {
   const errorMessage = error?.message || String(error);
   const errorString = JSON.stringify(error).toLowerCase();
   
-  // Log full error for developers
-  console.error("Full error details:", error);
+  // Log error message only (not the full object to avoid stack traces)
+  // Only in development mode
+  if (process.env.NODE_ENV === 'development') {
+    // Log just the message, not the full error object
+    console.warn("Error message:", errorMessage);
+  }
   
   // Metadata Symbol too long
   if (
@@ -75,12 +79,29 @@ export function parseUserFriendlyError(error: any): string {
     return "Insufficient SOL balance. Minting a cNFT requires approximately 0.3-0.4 SOL for rent exemption (creating the merkle tree and collection). Please add more SOL to your wallet.";
   }
 
+  // Transaction too large
+  if (
+    errorMessage.includes("too large") ||
+    errorMessage.includes("VersionedTransaction too large") ||
+    errorString.includes("too large") ||
+    errorString.includes("versionedtransaction too large") ||
+    errorString.includes("max: encoded/raw")
+  ) {
+    return "The transaction is too large to process. This can happen with very deep merkle trees. Please try again later or contact support if the issue persists.";
+  }
+
   // Transaction simulation failed (general)
   if (
     errorMessage.includes("Transaction simulation failed") ||
     errorMessage.includes("Simulation failed") ||
-    errorString.includes("simulation failed")
+    errorString.includes("simulation failed") ||
+    errorString.includes("failed to simulate transaction")
   ) {
+    // Check for transaction size first
+    if (errorString.includes("too large") || errorString.includes("max: encoded/raw")) {
+      return "The transaction is too large to process. This can happen with very deep merkle trees. Please try again later or contact support if the issue persists.";
+    }
+    
     // Check for specific causes
     if (errorString.includes("metadatauritoolong") || errorString.includes("0x177e")) {
       return "The image URL is too long. Please provide a Pinata JWT to upload to IPFS, or use a shorter image URL.";
@@ -118,16 +139,28 @@ export function parseUserFriendlyError(error: any): string {
   let sanitized = errorMessage
     .replace(/Error:\s*/gi, "")
     .replace(/Transaction\s+simulation\s+failed:\s*/gi, "")
+    .replace(/failed\s+to\s+simulate\s+transaction:\s*/gi, "")
+    .replace(/base64\s+encoded\s+solana_transaction[^\n]*/gi, "")
+    .replace(/VersionedTransaction[^\n]*/gi, "")
+    .replace(/bytes\s*\(max:[^)]*\)/gi, "")
     .replace(/Source:\s*Program[^\n]*/gi, "")
     .replace(/Caused\s+By:[^\n]*/gi, "")
     .replace(/Program\s+log:[^\n]*/gi, "")
     .replace(/custom\s+program\s+error:[^\n]*/gi, "")
     .replace(/0x[0-9a-f]+/gi, "")
+    .replace(/\[^\n]*InstructionError[^\n]*/gi, "")
     .trim();
   
   // If it's still too long or technical, provide a generic message
-  if (sanitized.length > 200 || sanitized.includes("Program") || sanitized.includes("Instruction")) {
-    return "An error occurred. Please check that your image URL is valid and not too long, and ensure your wallet is connected.";
+  if (
+    sanitized.length > 200 || 
+    sanitized.includes("Program") || 
+    sanitized.includes("Instruction") ||
+    sanitized.includes("VersionedTransaction") ||
+    sanitized.includes("base64") ||
+    sanitized.includes("bytes (max:")
+  ) {
+    return "An error occurred during fractionalization. Please ensure your wallet is connected, has sufficient funds, and try again. If the problem persists, the NFT may need more time to be indexed.";
   }
   
   return sanitized || "An unexpected error occurred. Please try again.";

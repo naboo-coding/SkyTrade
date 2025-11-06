@@ -1,22 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useMintCnft } from "@/hooks/useMintCnft";
-import { useCnftAssets } from "@/hooks/useCnftAssets";
-import { useAssetById } from "@/hooks/useAssetById";
 import { useToast } from "@/components/ToastContainer";
 import MintSuccessModal from "@/components/MintSuccessModal";
+import { CnftGalleryRef } from "@/components/CnftGallery";
 
-export default function MintCnftButton() {
+interface MintCnftButtonProps {
+  galleryRef?: React.RefObject<CnftGalleryRef>;
+}
+
+export default function MintCnftButton({ galleryRef }: MintCnftButtonProps = {} as MintCnftButtonProps) {
   const { publicKey } = useWallet();
   const { mintCnft, loading, error, assetId } = useMintCnft();
-  const { refetch } = useCnftAssets();
-  const { fetchAssetById, asset: fetchedAsset } = useAssetById();
   const { showToast } = useToast();
   const [showModal, setShowModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [pollingActive, setPollingActive] = useState(false);
   const [formData, setFormData] = useState({
     name: "Anna",
     symbol: "ANNA",
@@ -46,60 +46,19 @@ export default function MintCnftButton() {
       setShowModal(false);
       setShowSuccessModal(true);
       
-      // Wait for indexing, then refetch assets
-      // Helius DAS API typically takes 10-30 seconds to index new cNFTs
       console.log("Mint successful! Asset ID:", mintedAssetId);
-      console.log("Waiting for Helius DAS API indexing...");
       
-      setPollingActive(true);
-      
-      // First, try to fetch the asset directly by ID to verify it exists
-      // Then poll by owner
-      const startPolling = () => {
-        let attempts = 0;
-        const maxAttempts = 30; // Poll for 90 seconds total (30 * 3s)
-        const pollInterval = 3000; // 3 seconds
-        
-        const pollForAsset = setInterval(async () => {
-          attempts++;
-          console.log(`[Poll ${attempts}/${maxAttempts}] Refetching assets by owner...`);
-          
-          // Try direct fetch every 5 attempts (if asset exists but isn't indexed in owner's list)
-          if (attempts % 5 === 0 && mintedAssetId) {
-            console.log(`[Poll ${attempts}] Checking asset directly by ID...`);
-            try {
-              await fetchAssetById(mintedAssetId);
-            } catch (err) {
-              // Ignore "not found" errors - asset just needs more time to index
-            }
-          }
-          
-          // Always refetch owner's assets
-          refetch();
-          
-          // If we successfully fetched the asset by ID, also try to add it manually
-          if (fetchedAsset && mintedAssetId === fetchedAsset.id) {
-            console.log(`[Poll ${attempts}] Asset found by ID! Adding to gallery...`);
-            // The asset was found, so it should appear in the next refetch
-          }
-          
-          if (attempts >= maxAttempts) {
-            clearInterval(pollForAsset);
-            setPollingActive(false);
-            console.log("Stopped polling after 90 seconds. Asset may take longer to index.");
-            console.log("Please check the explorer and use Refresh button manually.");
-          }
-        }, pollInterval);
-        
-        // Stop polling after 2 minutes total
-        setTimeout(() => {
-          clearInterval(pollForAsset);
-          setPollingActive(false);
-        }, 120000);
-      };
-      
-      // Start polling after 5 seconds (give it a moment to settle)
-      setTimeout(startPolling, 5000);
+      // Refresh gallery when mint is confirmed (after delay to allow API indexing)
+      setTimeout(async () => {
+        if (galleryRef?.current) {
+          console.log("Refreshing gallery after successful mint confirmation...");
+          await galleryRef.current.refetch();
+        } else {
+          // Fallback: reload page if galleryRef is not available
+          console.log("Gallery ref not available, reloading page as fallback...");
+          window.location.reload();
+        }
+      }, 1500); // 1.5 second delay to give Helius DAS API time to index
       
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -107,6 +66,8 @@ export default function MintCnftButton() {
       console.error("Mint error:", err);
     }
   };
+
+  // Note: Gallery refresh is now handled automatically when mint is confirmed
 
   if (!publicKey) {
     return null;
@@ -198,10 +159,7 @@ export default function MintCnftButton() {
               {!assetId && (
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
                   <p className="text-xs text-blue-800 dark:text-blue-200">
-                    <strong>ℹ️ Note:</strong> Minting requires <strong>2 wallet approvals</strong>:
-                    <br />1. Create collection and merkle tree
-                    <br />2. Mint cNFT
-                    <br />This is normal and required for the minting process.
+                    <strong>ℹ️ Note:</strong> Minting requires <strong>1 wallet approval</strong> to create the collection, merkle tree, and mint the cNFT in a single transaction.
                   </p>
                 </div>
               )}
@@ -230,11 +188,8 @@ export default function MintCnftButton() {
       {showSuccessModal && assetId && (
         <MintSuccessModal
           assetId={assetId}
-          pollingActive={pollingActive}
-          fetchedAsset={fetchedAsset}
           onClose={() => {
             setShowSuccessModal(false);
-            setPollingActive(false);
           }}
         />
       )}
