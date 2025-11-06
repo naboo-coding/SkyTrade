@@ -374,7 +374,7 @@ export function useCnftAssets() {
             hasFiles: files && files.length > 0,
             filesCount: files?.length || 0,
             firstFileUri: files?.[0]?.uri?.slice(0, 50) + "..." || "none",
-            metadataImage: metadata.image?.slice(0, 50) + "..." || "none"
+            metadataImage: (typeof metadata.image === 'string' ? metadata.image.slice(0, 50) + "..." : "none")
           });
           
           // Try to get image from multiple sources

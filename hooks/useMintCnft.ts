@@ -32,18 +32,43 @@ export function useMintCnft() {
     formData.append("file", file);
     formData.append("type", "image");
 
-    const response = await fetch("/api/pinata/upload", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const response = await fetch("/api/pinata/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to upload image");
+      if (!response.ok) {
+        let errorMessage = "Failed to upload image";
+        try {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } catch (parseError) {
+          // If response is not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+          } catch (textError) {
+            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      return data.url;
+    } catch (err) {
+      // Handle network errors, CORS errors, etc.
+      if (err instanceof TypeError && err.message.includes("fetch")) {
+        throw new Error("Network error: Failed to connect to upload service. Please check your internet connection and try again.");
+      }
+      // Re-throw if it's already an Error with a message
+      if (err instanceof Error) {
+        throw err;
+      }
+      // Fallback for unknown errors
+      throw new Error(`Failed to upload image: ${String(err)}`);
     }
-
-    const data = await response.json();
-    return data.url;
   }, []);
 
   const uploadMetadataToPinata = useCallback(async (
@@ -62,18 +87,66 @@ export function useMintCnft() {
     formData.append("type", "metadata");
     formData.append("metadata", JSON.stringify(metadata));
 
-    const response = await fetch("/api/pinata/upload", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      console.log("📤 Uploading metadata to Pinata via API route...");
+      const response = await fetch("/api/pinata/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to upload metadata");
+      console.log("📥 Received response:", {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      if (!response.ok) {
+        let errorMessage = "Failed to upload metadata";
+        try {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+          console.error("❌ API error response:", error);
+        } catch (parseError) {
+          // If response is not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+            console.error("❌ API error text:", errorText);
+          } catch (textError) {
+            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            console.error("❌ Could not parse error response:", textError);
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log("✅ Metadata uploaded successfully:", data.url);
+      return data.url;
+    } catch (err) {
+      console.error("❌ Upload metadata error:", err);
+      
+      // Handle network errors, CORS errors, etc.
+      if (err instanceof TypeError) {
+        if (err.message.includes("fetch") || err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
+          throw new Error("Network error: Failed to connect to upload service. Please check your internet connection and ensure the API route is accessible.");
+        }
+      }
+      
+      // Handle DOMException (network errors)
+      if (err instanceof DOMException || (err as any)?.name === "NetworkError") {
+        throw new Error("Network error: Unable to reach the upload service. Please check your connection and try again.");
+      }
+      
+      // Re-throw if it's already an Error with a message
+      if (err instanceof Error) {
+        throw err;
+      }
+      
+      // Fallback for unknown errors
+      throw new Error(`Failed to upload metadata: ${String(err)}`);
     }
-
-    const data = await response.json();
-    return data.url;
   }, []);
 
   const mintCnft = useCallback(async (params: MintCnftParams) => {

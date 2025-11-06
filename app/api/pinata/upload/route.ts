@@ -32,51 +32,142 @@ export async function POST(request: NextRequest) {
       const uploadFormData = new FormData();
       uploadFormData.append("file", file);
 
-      const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${pinataJwt}`,
-        },
-        body: uploadFormData,
-      });
+      try {
+        const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${pinataJwt}`,
+          },
+          body: uploadFormData,
+        });
 
-      if (!response.ok) {
-        const error = await response.text();
+        if (!response.ok) {
+          let errorMessage = "Failed to upload image";
+          try {
+            const error = await response.text();
+            errorMessage = error || errorMessage;
+          } catch (textError) {
+            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          }
+          return NextResponse.json(
+            { error: `Failed to upload image: ${errorMessage}` },
+            { status: response.status }
+          );
+        }
+
+        const data = await response.json();
+        return NextResponse.json({
+          url: `https://gateway.pinata.cloud/ipfs/${data.IpfsHash}`,
+        });
+      } catch (fetchError: any) {
+        console.error("Pinata fetch error (image):", fetchError);
         return NextResponse.json(
-          { error: `Failed to upload image: ${error}` },
-          { status: response.status }
+          { error: `Network error uploading image: ${fetchError.message || "Failed to connect to Pinata"}` },
+          { status: 500 }
         );
       }
-
-      const data = await response.json();
-      return NextResponse.json({
-        url: `https://gateway.pinata.cloud/ipfs/${data.IpfsHash}`,
-      });
     } else if (type === "metadata") {
       // Upload metadata JSON to Pinata
-      const metadata = JSON.parse(formData.get("metadata") as string);
-
-      const response = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${pinataJwt}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(metadata),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
+      let metadata;
+      try {
+        const metadataString = formData.get("metadata") as string;
+        if (!metadataString) {
+          console.error("❌ Metadata string is missing");
+          return NextResponse.json(
+            { error: "Metadata is required" },
+            { status: 400 }
+          );
+        }
+        console.log("📋 Parsing metadata string, length:", metadataString.length);
+        metadata = JSON.parse(metadataString);
+        console.log("✅ Metadata parsed successfully:", { name: metadata.name, symbol: metadata.symbol });
+      } catch (parseError: any) {
+        console.error("❌ Failed to parse metadata JSON:", parseError);
         return NextResponse.json(
-          { error: `Failed to upload metadata: ${error}` },
-          { status: response.status }
+          { error: `Invalid metadata JSON: ${parseError.message}` },
+          { status: 400 }
         );
       }
 
-      const data = await response.json();
-      return NextResponse.json({
-        url: `https://gateway.pinata.cloud/ipfs/${data.IpfsHash}`,
-      });
+      // Add timeout to the fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      try {
+        console.log("📤 Uploading metadata to Pinata...");
+        const pinataUrl = "https://api.pinata.cloud/pinning/pinJSONToIPFS";
+        console.log("🔗 Pinata URL:", pinataUrl);
+        console.log("🔑 Has JWT:", !!pinataJwt);
+        
+        const response = await fetch(pinataUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${pinataJwt}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(metadata),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        console.log("📥 Pinata response:", {
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+        });
+
+        if (!response.ok) {
+          let errorMessage = "Failed to upload metadata";
+          try {
+            const error = await response.text();
+            errorMessage = error || errorMessage;
+            console.error("❌ Pinata error response:", error);
+          } catch (textError) {
+            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            console.error("❌ Could not read Pinata error response:", textError);
+          }
+          return NextResponse.json(
+            { error: `Failed to upload metadata: ${errorMessage}` },
+            { status: response.status }
+          );
+        }
+
+        const data = await response.json();
+        console.log("✅ Metadata uploaded successfully, IPFS hash:", data.IpfsHash);
+        return NextResponse.json({
+          url: `https://gateway.pinata.cloud/ipfs/${data.IpfsHash}`,
+        });
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        console.error("❌ Pinata fetch error (metadata):", {
+          name: fetchError?.name,
+          message: fetchError?.message,
+          stack: fetchError?.stack,
+          cause: fetchError?.cause,
+        });
+        
+        // Check if it's a timeout
+        if (fetchError?.name === "AbortError" || fetchError?.message?.includes("aborted")) {
+          return NextResponse.json(
+            { error: "Upload timeout: Pinata API did not respond within 30 seconds. Please try again." },
+            { status: 504 }
+          );
+        }
+        
+        // Check if it's a network error
+        if (fetchError instanceof TypeError || fetchError?.message?.includes("fetch")) {
+          return NextResponse.json(
+            { error: `Network error: Unable to connect to Pinata API. ${fetchError.message || "Please check your internet connection."}` },
+            { status: 503 }
+          );
+        }
+        
+        return NextResponse.json(
+          { error: `Network error uploading metadata: ${fetchError?.message || "Failed to connect to Pinata"}` },
+          { status: 500 }
+        );
+      }
     } else {
       return NextResponse.json(
         { error: "Invalid type. Must be 'image' or 'metadata'" },
