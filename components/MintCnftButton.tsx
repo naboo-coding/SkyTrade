@@ -8,7 +8,7 @@ import MintSuccessModal from "@/components/MintSuccessModal";
 import { CnftGalleryRef } from "@/components/CnftGallery";
 
 interface MintCnftButtonProps {
-  galleryRef?: React.RefObject<CnftGalleryRef>;
+  galleryRef?: React.RefObject<CnftGalleryRef | null>;
 }
 
 export default function MintCnftButton({ galleryRef }: MintCnftButtonProps = {} as MintCnftButtonProps) {
