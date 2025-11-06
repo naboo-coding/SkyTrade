@@ -74,14 +74,22 @@ export function useMintCnft() {
   const uploadMetadataToPinata = useCallback(async (
     name: string,
     symbol: string,
-    imageUrl: string
+    imageUrl?: string
   ): Promise<string> => {
-    const metadata = {
+    const metadata: {
+      name: string;
+      symbol: string;
+      description: string;
+      image?: string;
+    } = {
       name,
       symbol,
       description: `${name} cNFT for fractionalization`,
-      image: imageUrl,
     };
+    
+    if (imageUrl) {
+      metadata.image = imageUrl;
+    }
 
     const formData = new FormData();
     formData.append("type", "metadata");
@@ -195,9 +203,6 @@ export function useMintCnft() {
       if (params.imageFile) {
         imageUrl = await uploadImageToPinata(params.imageFile);
       }
-      if (!imageUrl) {
-        throw new Error("Image URL or file is required");
-      }
 
       // 2. Upload metadata to Pinata (always use Pinata for proper metadata storage)
       const name = params.name || "Daft-Punk cNFT";
@@ -209,7 +214,7 @@ export function useMintCnft() {
         throw new Error(`Symbol is too long. NFT symbols must be ${MAX_SYMBOL_LENGTH} characters or fewer. Your symbol "${symbol}" is ${symbol.length} characters. Please use a shorter symbol.`);
       }
       
-      // Always upload metadata to Pinata to ensure proper structure and image URL
+      // Always upload metadata to Pinata to ensure proper structure and image URL (image is optional)
       const metadataUrl = await uploadMetadataToPinata(name, symbol, imageUrl);
       
       // Validate the Pinata URL is not too long
