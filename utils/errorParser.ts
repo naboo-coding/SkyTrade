@@ -9,6 +9,18 @@ export function parseUserFriendlyError(error: any): string {
   // Log full error for developers
   console.error("Full error details:", error);
   
+  // Metadata Symbol too long
+  if (
+    errorMessage.includes("MetadataSymbolTooLong") ||
+    errorMessage.includes("Symbol in metadata is too long") ||
+    errorString.includes("metadatasymboltoolong") ||
+    errorString.includes("symbol in metadata is too long") ||
+    errorString.includes("0x177d") ||
+    errorMessage.includes("6013")
+  ) {
+    return "The symbol is too long. NFT symbols must be 10 characters or fewer. Please use a shorter symbol.";
+  }
+
   // Metadata URI too long
   if (
     errorMessage.includes("MetadataUriTooLong") ||
@@ -38,6 +50,31 @@ export function parseUserFriendlyError(error: any): string {
     return "Please provide an image URL or upload a file with a Pinata JWT.";
   }
   
+  // Insufficient funds
+  if (
+    errorMessage.includes("insufficient lamports") ||
+    errorMessage.includes("insufficient funds") ||
+    errorString.includes("insufficient lamports") ||
+    errorString.includes("insufficient funds") ||
+    errorString.includes("transfer: insufficient")
+  ) {
+    // Try to extract the amounts from the error
+    const lamportsMatch = errorMessage.match(/insufficient lamports (\d+), need (\d+)/i) || 
+                         errorString.match(/insufficient lamports (\d+), need (\d+)/i);
+    
+    if (lamportsMatch) {
+      const haveLamports = parseInt(lamportsMatch[1]);
+      const needLamports = parseInt(lamportsMatch[2]);
+      const haveSol = (haveLamports / 1e9).toFixed(4);
+      const needSol = (needLamports / 1e9).toFixed(4);
+      const shortfallSol = ((needLamports - haveLamports) / 1e9).toFixed(4);
+      
+      return `Insufficient SOL balance. You have ${haveSol} SOL but need ${needSol} SOL. Please add at least ${shortfallSol} SOL to your wallet to continue.`;
+    }
+    
+    return "Insufficient SOL balance. Minting a cNFT requires approximately 0.3-0.4 SOL for rent exemption (creating the merkle tree and collection). Please add more SOL to your wallet.";
+  }
+
   // Transaction simulation failed (general)
   if (
     errorMessage.includes("Transaction simulation failed") ||
@@ -47,6 +84,11 @@ export function parseUserFriendlyError(error: any): string {
     // Check for specific causes
     if (errorString.includes("metadatauritoolong") || errorString.includes("0x177e")) {
       return "The image URL is too long. Please provide a Pinata JWT to upload to IPFS, or use a shorter image URL.";
+    }
+    
+    // Check if it's an insufficient funds error in the logs
+    if (errorString.includes("insufficient lamports") || errorString.includes("insufficient funds")) {
+      return "Insufficient SOL balance. Minting a cNFT requires approximately 0.3-0.4 SOL for rent exemption. Please add more SOL to your wallet.";
     }
     
     return "Transaction failed. Please check your wallet has sufficient funds and try again. If the problem persists, ensure your image URL is not too long.";

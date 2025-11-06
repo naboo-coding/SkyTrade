@@ -176,6 +176,18 @@ export function useMintCnft() {
         updateRpcUrl(correctEndpoint);
       }
       
+      // Check wallet balance before attempting transaction
+      // Minting requires creating a collection NFT and merkle tree, which need rent exemption
+      // Estimated cost: ~0.3-0.4 SOL for tree creation (depth 14, canopy 8) + collection + transaction fees
+      const MIN_REQUIRED_SOL = 0.4; // Conservative estimate
+      const balance = await connection.getBalance(publicKey);
+      const balanceSol = balance / 1e9;
+      
+      if (balanceSol < MIN_REQUIRED_SOL) {
+        const shortfall = (MIN_REQUIRED_SOL - balanceSol).toFixed(4);
+        throw new Error(`Insufficient SOL balance. You have ${balanceSol.toFixed(4)} SOL but need at least ${MIN_REQUIRED_SOL} SOL to mint a cNFT (for rent exemption when creating the merkle tree and collection). Please add at least ${shortfall} SOL to your wallet.`);
+      }
+      
       const umi = umiWithCurrentWalletAdapter();
 
       // 1. Upload image if provided
@@ -190,6 +202,12 @@ export function useMintCnft() {
       // 2. Upload metadata to Pinata (always use Pinata for proper metadata storage)
       const name = params.name || "Daft-Punk cNFT";
       const symbol = params.symbol || "DP";
+      
+      // Validate symbol length (Metaplex Token Metadata requires max 10 characters)
+      const MAX_SYMBOL_LENGTH = 10;
+      if (symbol.length > MAX_SYMBOL_LENGTH) {
+        throw new Error(`Symbol is too long. NFT symbols must be ${MAX_SYMBOL_LENGTH} characters or fewer. Your symbol "${symbol}" is ${symbol.length} characters. Please use a shorter symbol.`);
+      }
       
       // Always upload metadata to Pinata to ensure proper structure and image URL
       const metadataUrl = await uploadMetadataToPinata(name, symbol, imageUrl);

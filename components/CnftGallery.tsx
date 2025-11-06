@@ -223,7 +223,7 @@ const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGa
       <div className="mb-4">
         <ManualAssetInput />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {assets.slice(0, displayCount).map((asset) => (
           <div
             key={asset.id}

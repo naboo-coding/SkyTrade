@@ -144,15 +144,36 @@ export default function MintCnftButton() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Symbol *
+                  Symbol * (max 10 characters)
                 </label>
                 <input
                   type="text"
                   value={formData.symbol}
                   onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  maxLength={10}
+                  className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                    formData.symbol.length > 10
+                      ? "border-red-500 dark:border-red-500"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
                 />
+                <div className="mt-1 flex justify-between items-center">
+                  <span className={`text-xs ${
+                    formData.symbol.length > 10
+                      ? "text-red-600 dark:text-red-400"
+                      : formData.symbol.length > 8
+                      ? "text-yellow-600 dark:text-yellow-400"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}>
+                    {formData.symbol.length} / 10 characters
+                  </span>
+                  {formData.symbol.length > 10 && (
+                    <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                      Symbol too long! Must be 10 characters or fewer.
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -188,7 +209,7 @@ export default function MintCnftButton() {
               <div className="flex space-x-3 pt-4">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || formData.symbol.length > 10}
                   className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? "Minting..." : "Mint cNFT"}
