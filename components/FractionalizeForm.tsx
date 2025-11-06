@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useFractionalize } from "@/hooks/useFractionalize";
-import { PublicKey } from "@solana/web3.js";
 import { useToast } from "@/components/ToastContainer";
 
 interface FractionalizeFormProps {
@@ -28,7 +27,6 @@ export default function FractionalizeForm({
       minReclaimPercent: "",
       minLiquidityPercent: "",
       minVolumePercent30d: "",
-      treasury: "",
     });
   }, [assetId]);
 
@@ -38,17 +36,12 @@ export default function FractionalizeForm({
     minReclaimPercent: "",
     minLiquidityPercent: "",
     minVolumePercent30d: "",
-    treasury: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      const treasury = formData.treasury
-        ? new PublicKey(formData.treasury)
-        : undefined;
-
       const signature = await fractionalize({
         assetId,
         totalSupply: formData.totalSupply,
@@ -64,7 +57,6 @@ export default function FractionalizeForm({
         minVolumePercent30d: formData.minVolumePercent30d
           ? parseInt(formData.minVolumePercent30d)
           : null,
-        treasury,
       });
 
       if (onSuccess && signature) {
@@ -211,23 +203,6 @@ export default function FractionalizeForm({
           }
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
           placeholder="Leave empty if not needed"
-        />
-      </div>
-
-      <div>
-        <label
-          htmlFor="treasury"
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-        >
-          Treasury Address - Optional
-        </label>
-        <input
-          id="treasury"
-          type="text"
-          value={formData.treasury}
-          onChange={(e) => setFormData({ ...formData, treasury: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-          placeholder="Leave empty to auto-generate"
         />
       </div>
 

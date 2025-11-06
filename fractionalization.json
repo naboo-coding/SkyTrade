@@ -397,10 +397,6 @@
           }
         },
         {
-          "name": "protocol_percent_fee",
-          "type": "u8"
-        },
-        {
           "name": "root",
           "type": {
             "array": [

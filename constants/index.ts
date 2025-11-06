@@ -8,8 +8,11 @@ export const METAPLEX_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybz
 export const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 
-// Protocol fee percentage (hardcoded to 5%)
-export const PROTOCOL_PERCENT_FEE = 5;
+// Protocol fee percentage (hardcoded to 5% in program)
+export const FRACTIONALIZATION_FEE_PERCENTAGE = 5;
+
+// Treasury account (hardcoded in program)
+export const TREASURY_ACCOUNT = new PublicKey("tDeV8biSQiZCEdPvVmJ2fMNh5r7horSMgJ51mYi8HL5");
 
 // Devnet RPC - should be set in environment variables
 export const HELIUS_RPC_URL = process.env.NEXT_PUBLIC_HELIUS_RPC_URL || "";

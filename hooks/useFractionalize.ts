@@ -9,7 +9,6 @@ import {
   TransactionMessage,
   VersionedTransaction,
   ComputeBudgetProgram,
-  Keypair,
   Connection,
 } from "@solana/web3.js";
 import {
@@ -18,7 +17,7 @@ import {
 import umiWithCurrentWalletAdapter from "@/lib/umi/umiWithCurrentWalletAdapter";
 import { getAssetWithProof } from "@metaplex-foundation/mpl-bubblegum";
 import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
-import { PROGRAM_ID, MPL_BUBBLEGUM_ID, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID_V1, SPL_NOOP_PROGRAM_ID_V1, METAPLEX_PROGRAM_ID, PROTOCOL_PERCENT_FEE } from "@/constants";
+import { PROGRAM_ID, MPL_BUBBLEGUM_ID, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID_V1, SPL_NOOP_PROGRAM_ID_V1, METAPLEX_PROGRAM_ID, TREASURY_ACCOUNT } from "@/constants";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import FractionalizationIdl from "../fractionalization.json";
@@ -32,7 +31,6 @@ interface FractionalizeParams {
   minReclaimPercent?: number | null;
   minLiquidityPercent?: number | null;
   minVolumePercent30d?: number | null;
-  treasury?: PublicKey; // Optional treasury address
 }
 
 export function useFractionalize() {
@@ -205,14 +203,11 @@ export function useFractionalize() {
         METAPLEX_PROGRAM_ID
       );
 
-      // 9. Treasury (use provided or generate a dummy one for testing)
-      const treasury = params.treasury || Keypair.generate().publicKey;
-
-      // 10. Convert total supply to BN (with 9 decimals)
+      // 9. Convert total supply to BN (with 9 decimals)
       const totalSupply = new anchor.BN(params.totalSupply)
         .mul(new anchor.BN(10).pow(new anchor.BN(9)));
 
-      // 11. Build fractionalization instruction
+      // 10. Build fractionalization instruction
       const fractionalizeIx = await program.methods
         .fractionalizeV1(
           totalSupply,
@@ -228,7 +223,6 @@ export function useFractionalize() {
           params.minVolumePercent30d !== null && params.minVolumePercent30d !== undefined
             ? params.minVolumePercent30d
             : null,
-          PROTOCOL_PERCENT_FEE,
           Array.from(assetWithProof.root),
           Array.from(assetWithProof.dataHash),
           Array.from(assetWithProof.creatorHash),
@@ -240,7 +234,7 @@ export function useFractionalize() {
         )
         .accounts({
           fractionalizer: publicKey,
-          treasury: treasury,
+          treasury: TREASURY_ACCOUNT,
           nftAsset: nftAssetIdWeb3,
           merkleTree: merkleTreeIdWeb3,
           treeAuthority: treeAuthority,
