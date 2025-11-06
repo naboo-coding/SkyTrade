@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useFractionalize } from "@/hooks/useFractionalize";
 import { PublicKey } from "@solana/web3.js";
+import { useToast } from "@/components/ToastContainer";
 
 interface FractionalizeFormProps {
   assetId: string;
@@ -16,6 +17,7 @@ export default function FractionalizeForm({
   onCancel,
 }: FractionalizeFormProps) {
   const { fractionalize, loading, error, signature } = useFractionalize();
+  const { showToast } = useToast();
 
   // Reset form state when assetId changes (when user selects a different NFT)
   // The component will remount with a new key, which resets all hook state including signature
@@ -67,9 +69,11 @@ export default function FractionalizeForm({
 
       if (onSuccess && signature) {
         onSuccess(signature);
+        showToast(`Fractionalization successful! Signature: ${signature.slice(0, 8)}...`, "success");
       }
     } catch (err) {
-      // Error is handled by the hook
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      showToast(`Fractionalization failed: ${errorMsg}`, "error");
     }
   };
 
@@ -227,18 +231,10 @@ export default function FractionalizeForm({
         />
       </div>
 
-      {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-        </div>
-      )}
-
       {!error && (
         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
           <p className="text-xs text-blue-800 dark:text-blue-200">
-            <strong>ℹ️ Note:</strong> This process requires <strong>2 wallet approvals</strong>:
-            <br />1. Create and extend lookup table
-            <br />2. Fractionalize transaction
+            <strong>ℹ️ Note:</strong> This process requires <strong>1 wallet approval</strong> for the fractionalization transaction.
             <br />This is normal and required for the fractionalization process.
           </p>
         </div>

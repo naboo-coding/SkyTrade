@@ -63,8 +63,18 @@ export function useCnftAssets() {
   }, []);
 
   const fetchAssets = useCallback(async () => {
+    console.log("🔄 ===== fetchAssets CALLED =====");
+    console.log("🔄 fetchAssets params:", {
+      hasPublicKey: !!publicKey,
+      publicKey: publicKey?.toBase58().slice(0, 8) + "...",
+      hasWallet: !!wallet?.adapter,
+      hasEndpoint: !!endpoint,
+      endpoint: endpoint?.slice(0, 50) + "..."
+    });
+    
     // Early return if wallet is not ready - check all conditions
     if (!publicKey || !wallet?.adapter || !endpoint) {
+      console.log("⚠️ fetchAssets early return - missing params");
       // Preserve manually added assets when wallet not connected (but filter deleted ones)
       const deletedIds = deletedAssetIdsRef.current;
       setAssets((prev) => prev.filter(a => manuallyAddedAssetIdsRef.current.has(a.id) && !deletedIds.has(a.id)));
@@ -315,7 +325,9 @@ export function useCnftAssets() {
 
       // Filter for compressed NFTs (cNFTs) only
       const cnfts: CnftAsset[] = [];
+      const metadataFetchPromises: Promise<void>[] = [];
       
+      // First pass: collect all assets and prepare metadata fetches
       for (const asset of response.items || []) {
         const isCompressed = asset.compression?.compressed === true;
         const assetOwner = asset.ownership?.owner;
@@ -338,24 +350,108 @@ export function useCnftAssets() {
             // Still add it but log the mismatch
           }
           
+          // Log the full asset structure to understand what we're working with
+          console.log("🔍 Processing asset structure:", {
+            id: asset.id,
+            hasContent: !!asset.content,
+            contentKeys: asset.content ? Object.keys(asset.content) : [],
+            hasMetadata: !!asset.content?.metadata,
+            hasFiles: !!asset.content?.files,
+            metadataKeys: asset.content?.metadata ? Object.keys(asset.content.metadata) : [],
+            filesLength: asset.content?.files?.length || 0,
+            fullContent: JSON.stringify(asset.content, null, 2).slice(0, 500)
+          });
+          
           const metadata = asset.content?.metadata || {};
           const files = asset.content?.files || [];
           
-          console.log("✅ Adding compressed NFT to gallery:", {
-            id: asset.id,
-            name: metadata.name || "Unnamed",
-            owner: asset.ownership.owner,
-            ownerMatches,
-            hasImage: !!(files[0]?.uri || metadata.uri)
+          // Also check json_uri which might contain the metadata URI
+          const jsonUri = asset.content?.json_uri as string | undefined;
+          const metadataUri = metadata.uri as string | undefined || jsonUri;
+          
+          console.log("📋 Asset metadata info:", {
+            metadataUri: metadataUri?.slice(0, 50) + "...",
+            hasFiles: files && files.length > 0,
+            filesCount: files?.length || 0,
+            firstFileUri: files?.[0]?.uri?.slice(0, 50) + "..." || "none",
+            metadataImage: metadata.image?.slice(0, 50) + "..." || "none"
           });
           
-          cnfts.push({
+          // Try to get image from multiple sources
+          let imageUrl: string | undefined;
+          
+          // First, try files array
+          if (files && files.length > 0) {
+            imageUrl = (files[0]?.uri || files[0]?.cdn_uri) as string | undefined;
+            console.log(`📸 Found image in files: ${imageUrl?.slice(0, 50)}...`);
+          }
+          
+          // Fallback to metadata.image if available
+          if (!imageUrl && metadata.image) {
+            imageUrl = metadata.image as string;
+            console.log(`📸 Found image in metadata.image: ${imageUrl?.slice(0, 50)}...`);
+          }
+          
+          // If no image yet, we'll fetch from metadata URI in parallel
+          const assetData: CnftAsset = {
             id: asset.id,
             name: metadata.name || "Unnamed cNFT",
             symbol: metadata.symbol,
-            uri: metadata.uri as string | undefined,
-            image: (files[0]?.uri || metadata.uri) as string | undefined, // Try to get image from files or metadata
+            uri: metadataUri,
+            image: imageUrl,
             owner: asset.ownership.owner,
+          };
+          
+          console.log("📦 Created assetData:", {
+            id: assetData.id.slice(0, 8) + "...",
+            name: assetData.name,
+            hasImage: !!assetData.image,
+            imageUrl: assetData.image?.slice(0, 50) + "..." || "none",
+            hasUri: !!assetData.uri
+          });
+          
+          // Store index for updating after fetch
+          const assetIndex = cnfts.length;
+          cnfts.push(assetData);
+          
+          // If we need to fetch metadata, add to promises
+          if (!imageUrl && metadataUri) {
+            console.log(`🔄 Will fetch metadata from URI: ${metadataUri.slice(0, 50)}...`);
+            const fetchPromise = (async () => {
+              try {
+                console.log(`🌐 Fetching metadata from: ${metadataUri}`);
+                const metadataResponse = await fetch(metadataUri);
+                console.log(`📥 Metadata response status: ${metadataResponse.status}`);
+                if (metadataResponse.ok) {
+                  const metadataJson = await metadataResponse.json();
+                  console.log("📄 Metadata JSON keys:", Object.keys(metadataJson));
+                  const fetchedImageUrl = metadataJson.image || metadataJson.image_url || metadataJson.imageUrl;
+                  if (fetchedImageUrl && cnfts[assetIndex]) {
+                    // Update the image in the array
+                    cnfts[assetIndex].image = fetchedImageUrl;
+                    console.log(`✅ Fetched image for ${asset.id.slice(0, 8)}...: ${fetchedImageUrl.slice(0, 50)}...`);
+                  } else {
+                    console.log(`⚠️ No image found in metadata JSON for ${asset.id.slice(0, 8)}...`);
+                  }
+                } else {
+                  console.warn(`❌ Metadata fetch failed with status ${metadataResponse.status} for ${asset.id.slice(0, 8)}...`);
+                }
+              } catch (err) {
+                console.error(`❌ Failed to fetch metadata from ${metadataUri}:`, err);
+              }
+            })();
+            metadataFetchPromises.push(fetchPromise);
+          } else if (!imageUrl && !metadataUri) {
+            console.log(`⚠️ No image and no metadata URI for ${asset.id.slice(0, 8)}...`);
+          }
+          
+          console.log("✅ Adding compressed NFT to gallery:", {
+            id: asset.id.slice(0, 8) + "...",
+            name: metadata.name || "Unnamed",
+            owner: asset.ownership.owner.slice(0, 8) + "...",
+            ownerMatches,
+            hasImage: !!assetData.image,
+            imageSource: assetData.image ? "direct" : (metadataUri ? "will fetch" : "none")
           });
         } else {
           if (!isCompressed) {
@@ -365,6 +461,36 @@ export function useCnftAssets() {
             console.log(`⊘ Skipping - no owner: ${asset.id?.slice(0, 16)}...`);
           }
         }
+      }
+      
+      // Wait for all metadata fetches to complete and update images
+      let finalCnfts = cnfts;
+      console.log(`🔄 Starting metadata fetch for ${metadataFetchPromises.length} assets...`);
+      if (metadataFetchPromises.length > 0) {
+        const results = await Promise.allSettled(metadataFetchPromises);
+        // Log results for debugging
+        const successful = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+        console.log(`📸 Metadata fetch complete: ${successful} successful, ${failed} failed`);
+        
+        // Create new array with updated images to ensure React detects changes
+        // This is important because we mutated objects in the array
+        finalCnfts = cnfts.map(asset => ({ ...asset }));
+        
+        // Log to verify images
+        console.log(`📊 Final image status for ${finalCnfts.length} assets:`);
+        finalCnfts.forEach((asset, idx) => {
+          if (asset.image) {
+            console.log(`  [${idx + 1}] ✅ ${asset.id.slice(0, 8)}... has image: ${asset.image.slice(0, 50)}...`);
+          } else {
+            console.log(`  [${idx + 1}] ⚠️ ${asset.id.slice(0, 8)}... has NO image`);
+          }
+        });
+      } else {
+        console.log(`ℹ️ No metadata fetches needed - ${cnfts.length} assets processed`);
+        finalCnfts.forEach((asset, idx) => {
+          console.log(`  [${idx + 1}] ${asset.id.slice(0, 8)}... image: ${asset.image ? asset.image.slice(0, 50) + "..." : "NONE"}`);
+        });
       }
 
       // Merge manually added assets with API results
@@ -423,14 +549,15 @@ export function useCnftAssets() {
           totalManual: allManualAssets.length,
           manualIds: allManualAssets.map(a => a.id.slice(0, 16) + "..."),
           manualIdsSet: Array.from(currentManualIds).map(id => id.slice(0, 16) + "..."),
-          apiCount: cnfts.length,
-          apiIds: cnfts.map(a => a.id.slice(0, 16) + "..."),
+          apiCount: finalCnfts.length,
+          apiIds: finalCnfts.map(a => a.id.slice(0, 16) + "..."),
           deletedCount: currentDeletedIds.size,
           deletedIds: Array.from(currentDeletedIds).map(id => id.slice(0, 16) + "...")
         });
         
         // Combine manual assets with API results (avoid duplicates)
-        const mergedBeforeFilter = [...cnfts, ...allManualAssets.filter(a => !cnfts.some(apiAsset => apiAsset.id === a.id))];
+        // Use finalCnfts which has updated images from metadata fetches
+        const mergedBeforeFilter = [...finalCnfts, ...allManualAssets.filter(a => !finalCnfts.some(apiAsset => apiAsset.id === a.id))];
         
         // IMPORTANT: Filter out deleted assets, BUT preserve manually added ones that were re-added
         // If an asset is manually added (in currentManualIds), we should check if it was recently re-added
@@ -460,12 +587,12 @@ export function useCnftAssets() {
           console.log(`🚫 Filtered out ${filteredCount} deleted asset(s) from merged results`);
         }
         
-        console.log(`✅ Merged ${merged.length} assets: ${cnfts.length} from API + ${allManualAssets.length} manually added (${filteredCount} deleted)`);
+        console.log(`✅ Merged ${merged.length} assets: ${finalCnfts.length} from API + ${allManualAssets.length} manually added (${filteredCount} deleted)`);
         console.log("✅ Final merged asset IDs:", merged.map(a => a.id.slice(0, 16) + "..."));
         console.log("✅ Manual asset IDs that should be preserved:", Array.from(currentManualIds));
         return merged;
       });
-      console.log(`Found ${cnfts.length} compressed NFTs out of ${response.items?.length || 0} total items`);
+      console.log(`Found ${finalCnfts.length} compressed NFTs out of ${response.items?.length || 0} total items`);
     } catch (err) {
       // Don't show error if it's just "no assets found" or "undefined owner" - that's expected
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -624,14 +751,28 @@ export function useCnftAssets() {
       
       // Try to get image from multiple sources
       let imageUrl: string | undefined;
+      
+      // First, try files array
       if (files && files.length > 0) {
         imageUrl = (files[0]?.uri || files[0]?.cdn_uri) as string | undefined;
       }
+      
+      // If no image from files, try to fetch from metadata URI
+      if (!imageUrl && metadata.uri) {
+        try {
+          const metadataResponse = await fetch(metadata.uri as string);
+          if (metadataResponse.ok) {
+            const metadataJson = await metadataResponse.json();
+            imageUrl = metadataJson.image || metadataJson.image_url || metadataJson.imageUrl;
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch metadata from ${metadata.uri}:`, err);
+        }
+      }
+      
+      // Fallback to metadata.image if available
       if (!imageUrl && metadata.image) {
         imageUrl = metadata.image as string;
-      }
-      if (!imageUrl && metadata.uri) {
-        imageUrl = metadata.uri as string;
       }
       
       const newAsset: CnftAsset = {

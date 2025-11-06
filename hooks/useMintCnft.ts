@@ -8,7 +8,6 @@ import { createNft } from "@metaplex-foundation/mpl-token-metadata";
 import { generateSigner, publicKey, percentAmount, TransactionBuilder } from "@metaplex-foundation/umi";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
-import { uploadImageToPinata as uploadImageUtil, uploadMetadataToPinata as uploadMetadataUtil } from "@/utils/uploadToPinata";
 import { parseUserFriendlyError } from "@/utils/errorParser";
 import useUmiStore from "@/store/useUmiStore";
 
@@ -17,7 +16,6 @@ interface MintCnftParams {
   imageUrl?: string;
   name?: string;
   symbol?: string;
-  pinataJwt?: string;
 }
 
 export function useMintCnft() {
@@ -29,17 +27,53 @@ export function useMintCnft() {
   const [error, setError] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
 
-  const uploadImageToPinataHook = useCallback(async (file: File, pinataJwt: string): Promise<string> => {
-    return uploadImageUtil(file, pinataJwt);
+  const uploadImageToPinata = useCallback(async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", "image");
+
+    const response = await fetch("/api/pinata/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to upload image");
+    }
+
+    const data = await response.json();
+    return data.url;
   }, []);
 
-  const uploadMetadataToPinataHook = useCallback(async (
+  const uploadMetadataToPinata = useCallback(async (
     name: string,
     symbol: string,
-    imageUrl: string,
-    pinataJwt: string
+    imageUrl: string
   ): Promise<string> => {
-    return uploadMetadataUtil(name, symbol, imageUrl, pinataJwt);
+    const metadata = {
+      name,
+      symbol,
+      description: `${name} cNFT for fractionalization`,
+      image: imageUrl,
+    };
+
+    const formData = new FormData();
+    formData.append("type", "metadata");
+    formData.append("metadata", JSON.stringify(metadata));
+
+    const response = await fetch("/api/pinata/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to upload metadata");
+    }
+
+    const data = await response.json();
+    return data.url;
   }, []);
 
   const mintCnft = useCallback(async (params: MintCnftParams) => {
@@ -73,40 +107,24 @@ export function useMintCnft() {
 
       // 1. Upload image if provided
       let imageUrl = params.imageUrl;
-      if (params.imageFile && params.pinataJwt) {
-        imageUrl = await uploadImageToPinataHook(params.imageFile, params.pinataJwt);
+      if (params.imageFile) {
+        imageUrl = await uploadImageToPinata(params.imageFile);
       }
       if (!imageUrl) {
-        throw new Error("Image URL or file with Pinata JWT required");
+        throw new Error("Image URL or file is required");
       }
 
-      // 2. Upload metadata
+      // 2. Upload metadata to Pinata (always use Pinata for proper metadata storage)
       const name = params.name || "Daft-Punk cNFT";
       const symbol = params.symbol || "DP";
-      let metadataUrl: string;
       
-      // Metaplex Bubblegum has a URI length limit of ~200 characters
-      // Check if the image URL would create a URI that's too long
-      const testMetadataUrl = `https://example.com/metadata.json?name=${encodeURIComponent(name)}&symbol=${encodeURIComponent(symbol)}&image=${encodeURIComponent(imageUrl)}`;
+      // Always upload metadata to Pinata to ensure proper structure and image URL
+      const metadataUrl = await uploadMetadataToPinata(name, symbol, imageUrl);
+      
+      // Validate the Pinata URL is not too long
       const MAX_URI_LENGTH = 200;
-      
-      if (params.pinataJwt) {
-        metadataUrl = await uploadMetadataToPinataHook(name, symbol, imageUrl, params.pinataJwt);
-        
-        // Validate the Pinata URL is also not too long
-        if (metadataUrl.length > MAX_URI_LENGTH) {
-          throw new Error(`Metadata URI is too long (${metadataUrl.length} characters). The maximum allowed length is ${MAX_URI_LENGTH} characters. Please use a shorter image URL or contact support.`);
-        }
-      } else {
-        // Check if the constructed URL would exceed the limit
-        if (testMetadataUrl.length > MAX_URI_LENGTH) {
-          throw new Error(
-            `Image URL is too long to create a valid metadata URI (would be ${testMetadataUrl.length} characters, max is ${MAX_URI_LENGTH}). ` +
-            `Please provide a Pinata JWT to upload to IPFS, or use a shorter image URL (under ${Math.max(0, MAX_URI_LENGTH - 100)} characters).`
-          );
-        }
-        // Use a default metadata URL if Pinata is not available and URL is short enough
-        metadataUrl = testMetadataUrl;
+      if (metadataUrl.length > MAX_URI_LENGTH) {
+        throw new Error(`Metadata URI is too long (${metadataUrl.length} characters). The maximum allowed length is ${MAX_URI_LENGTH} characters.`);
       }
 
       // 3. Create collection and merkle tree in a single transaction to reduce wallet approvals
@@ -196,7 +214,7 @@ export function useMintCnft() {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, wallet, endpoint, network, updateRpcUrl, uploadImageToPinataHook, uploadMetadataToPinataHook]);
+  }, [publicKey, wallet, endpoint, network, updateRpcUrl, uploadImageToPinata, uploadMetadataToPinata]);
 
   return { mintCnft, loading, error, assetId };
 }

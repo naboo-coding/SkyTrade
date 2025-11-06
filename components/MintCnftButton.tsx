@@ -5,19 +5,22 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useMintCnft } from "@/hooks/useMintCnft";
 import { useCnftAssets } from "@/hooks/useCnftAssets";
 import { useAssetById } from "@/hooks/useAssetById";
+import { useToast } from "@/components/ToastContainer";
+import MintSuccessModal from "@/components/MintSuccessModal";
 
 export default function MintCnftButton() {
   const { publicKey } = useWallet();
   const { mintCnft, loading, error, assetId } = useMintCnft();
   const { refetch } = useCnftAssets();
   const { fetchAssetById, asset: fetchedAsset } = useAssetById();
+  const { showToast } = useToast();
   const [showModal, setShowModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [pollingActive, setPollingActive] = useState(false);
   const [formData, setFormData] = useState({
-    name: "Daft-Punk cNFT",
-    symbol: "DP",
-    imageUrl: "https://gateway.pinata.cloud/ipfs/QmYourImageHashHere", // You can use a default image URL
-    pinataJwt: "",
+    name: "Anna",
+    symbol: "ANNA",
+    imageUrl: "",
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
 
@@ -37,8 +40,11 @@ export default function MintCnftButton() {
         symbol: formData.symbol,
         imageUrl: formData.imageUrl || undefined,
         imageFile: imageFile || undefined,
-        pinataJwt: formData.pinataJwt || undefined,
       });
+      
+      // Close the mint modal and show success modal
+      setShowModal(false);
+      setShowSuccessModal(true);
       
       // Wait for indexing, then refetch assets
       // Helius DAS API typically takes 10-30 seconds to index new cNFTs
@@ -96,7 +102,8 @@ export default function MintCnftButton() {
       setTimeout(startPolling, 5000);
       
     } catch (err) {
-      // Error is handled by the hook
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      showToast(`Mint failed: ${errorMsg}`, "error");
       console.error("Mint error:", err);
     }
   };
@@ -165,36 +172,9 @@ export default function MintCnftButton() {
                   onChange={handleFileChange}
                   className="w-full text-sm text-gray-500 dark:text-gray-400"
                 />
-                {formData.imageUrl && formData.imageUrl.length > 100 && !formData.pinataJwt && (
-                  <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
-                    ⚠️ Long image URLs may require Pinata JWT. If you get a "URI too long" error, please provide a Pinata JWT.
-                  </p>
-                )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Pinata JWT (Recommended for long URLs)
-                </label>
-                <input
-                  type="password"
-                  value={formData.pinataJwt}
-                  onChange={(e) => setFormData({ ...formData, pinataJwt: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="Leave empty if using short image URL"
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Required if image URL is longer than ~100 characters. Uploads metadata to IPFS for shorter URIs.
-                </p>
-              </div>
-
-              {error && (
-                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                  <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-                </div>
-              )}
-
-              {!error && !assetId && (
+              {!assetId && (
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
                   <p className="text-xs text-blue-800 dark:text-blue-200">
                     <strong>ℹ️ Note:</strong> Minting requires <strong>2 wallet approvals</strong>:
@@ -202,55 +182,6 @@ export default function MintCnftButton() {
                     <br />2. Mint cNFT
                     <br />This is normal and required for the minting process.
                   </p>
-                </div>
-              )}
-
-              {assetId && (
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
-                  <p className="text-sm text-green-800 dark:text-green-200 mb-2 font-semibold">
-                    ✅ Mint Successful!
-                  </p>
-                  <p className="text-xs text-green-700 dark:text-green-300 mb-2 font-mono break-all">
-                    Asset ID: {assetId}
-                  </p>
-                  {pollingActive && (
-                    <p className="text-xs text-green-700 dark:text-green-300 mb-2">
-                      🔄 Polling for asset (every 3s, up to 90s)... This may take 30-60 seconds for Helius to index.
-                    </p>
-                  )}
-                  {fetchedAsset && (
-                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                      ✓ Asset verified! It exists and is indexed. It should appear in your gallery now.
-                    </p>
-                  )}
-                  {error && error.includes("not yet indexed") && (
-                    <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-2">
-                      ⏳ Asset not yet indexed. This is normal - Helius DAS API takes 30-60 seconds to index new assets.
-                    </p>
-                  )}
-                  <p className="text-xs text-green-700 dark:text-green-300 mb-2">
-                    💡 You can close this modal and use the "Refresh Assets" button in the gallery.
-                  </p>
-                  <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-800 dark:text-yellow-300">
-                    <p className="font-semibold mb-1">⚠️ Wallet Warning Notice:</p>
-                    <p>Your wallet may show this NFT as "Unverified" - this is expected for test NFTs. The collection isn't verified, but the NFT is fully functional and safe to use.</p>
-                  </div>
-                  <div className="flex flex-col gap-2 mt-2">
-                    <a
-                      href={`https://explorer.solana.com/address/${assetId}?cluster=devnet`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      🔍 View on Solana Explorer →
-                    </a>
-                    <button
-                      onClick={() => fetchAssetById(assetId)}
-                      className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                      Verify Asset Exists
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -273,6 +204,18 @@ export default function MintCnftButton() {
             </form>
           </div>
         </div>
+      )}
+
+      {showSuccessModal && assetId && (
+        <MintSuccessModal
+          assetId={assetId}
+          pollingActive={pollingActive}
+          fetchedAsset={fetchedAsset}
+          onClose={() => {
+            setShowSuccessModal(false);
+            setPollingActive(false);
+          }}
+        />
       )}
     </>
   );

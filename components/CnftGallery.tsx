@@ -3,6 +3,7 @@
 import { useCnftAssets } from "@/hooks/useCnftAssets";
 import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import ManualAssetInput from "./ManualAssetInput";
+import { isIpfsUrl, getAllGatewayUrls } from "@/utils/ipfsGateway";
 
 interface CnftGalleryProps {
   onSelectAsset: (assetId: string) => void;
@@ -23,11 +24,47 @@ const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGa
   }));
 
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  const [imageFallbacks, setImageFallbacks] = useState<Map<string, string[]>>(new Map());
+  const [currentImageIndex, setCurrentImageIndex] = useState<Map<string, number>>(new Map());
   const [deleteMode, setDeleteMode] = useState(false);
   const [assetsToDelete, setAssetsToDelete] = useState<Set<string>>(new Set());
+  const [displayCount, setDisplayCount] = useState(10);
 
-  const handleImageError = (assetId: string) => {
+  const handleImageError = (assetId: string, imageUrl: string) => {
+    // Don't log as error - just as warning
+    console.warn(`⚠️ Image failed to load for ${assetId.slice(0, 8)}...: ${imageUrl}`);
+    
+    // If it's an IPFS URL, try fallback gateways
+    if (isIpfsUrl(imageUrl)) {
+      const fallbackUrls = getAllGatewayUrls(imageUrl);
+      const currentIndex = currentImageIndex.get(assetId) || 0;
+      
+      if (currentIndex < fallbackUrls.length - 1) {
+        // Try next gateway
+        const nextIndex = currentIndex + 1;
+        setCurrentImageIndex(prev => new Map(prev).set(assetId, nextIndex));
+        setImageFallbacks(prev => new Map(prev).set(assetId, fallbackUrls));
+        console.log(`🔄 Trying fallback gateway ${nextIndex + 1}/${fallbackUrls.length} for ${assetId.slice(0, 8)}...`);
+        return; // Don't mark as error yet, try next gateway
+      }
+    }
+    
+    // All gateways failed or not IPFS - mark as error
     setImageErrors((prev) => new Set(prev).add(assetId));
+  };
+  
+  const getImageUrl = (asset: { id: string; image?: string }): string | undefined => {
+    if (!asset.image) return undefined;
+    
+    // If we have fallback URLs for this asset, use the current one
+    const fallbacks = imageFallbacks.get(asset.id);
+    const currentIdx = currentImageIndex.get(asset.id);
+    
+    if (fallbacks && currentIdx !== undefined && currentIdx > 0) {
+      return fallbacks[currentIdx];
+    }
+    
+    return asset.image;
   };
 
   if (loading) {
@@ -187,7 +224,7 @@ const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGa
         <ManualAssetInput />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {assets.map((asset) => (
+        {assets.slice(0, displayCount).map((asset) => (
           <div
             key={asset.id}
             onClick={() => {
@@ -221,16 +258,51 @@ const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGa
               </div>
             )}
             <div>
-              <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                {!imageErrors.has(asset.id) && asset.image ? (
-                  <img
-                    src={asset.image}
-                    alt={asset.name}
-                    className="w-full h-full object-cover"
-                    onError={() => handleImageError(asset.id)}
-                  />
+              <div className="aspect-square bg-gray-100 dark:bg-gray-800 flex items-center justify-center relative">
+                {!imageErrors.has(asset.id) && getImageUrl(asset) ? (
+                  <>
+                    <img
+                      key={`${asset.id}-${currentImageIndex.get(asset.id) || 0}`}
+                      src={getImageUrl(asset)}
+                      alt={asset.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const imgUrl = getImageUrl(asset) || asset.image || '';
+                        handleImageError(asset.id, imgUrl);
+                      }}
+                      onLoad={() => {
+                        const imgUrl = getImageUrl(asset) || asset.image || '';
+                        console.log(`✅ Image loaded successfully for ${asset.id.slice(0, 8)}...: ${imgUrl.slice(0, 50)}...`);
+                        // Reset fallback state on success
+                        setImageFallbacks(prev => {
+                          const newMap = new Map(prev);
+                          newMap.delete(asset.id);
+                          return newMap;
+                        });
+                        setCurrentImageIndex(prev => {
+                          const newMap = new Map(prev);
+                          newMap.delete(asset.id);
+                          return newMap;
+                        });
+                      }}
+                      loading="lazy"
+                    />
+                    {/* Debug overlay - remove in production */}
+                    {process.env.NODE_ENV === 'development' && (
+                      <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white text-xs p-1 opacity-0 hover:opacity-100 transition-opacity">
+                        {getImageUrl(asset)?.slice(0, 30)}...
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <div className="text-gray-400 dark:text-gray-600 text-4xl">🖼️</div>
+                  <div className="text-gray-400 dark:text-gray-600 text-4xl flex flex-col items-center gap-1">
+                    <span>🖼️</span>
+                    {process.env.NODE_ENV === 'development' && (
+                      <span className="text-xs text-gray-500">
+                        {asset.image ? 'Failed to load' : 'No image'}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="p-3 bg-white dark:bg-gray-900">
@@ -248,6 +320,16 @@ const CnftGallery = forwardRef<CnftGalleryRef, CnftGalleryProps>(function CnftGa
           </div>
         ))}
       </div>
+      {assets.length > displayCount && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => setDisplayCount(prev => prev + 10)}
+            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Load More ({assets.length - displayCount} remaining)
+          </button>
+        </div>
+      )}
     </div>
   );
 });

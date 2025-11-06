@@ -11,8 +11,6 @@ import {
   ComputeBudgetProgram,
   Keypair,
   Connection,
-  AddressLookupTableProgram,
-  AddressLookupTableAccount,
 } from "@solana/web3.js";
 import {
   getAssociatedTokenAddressSync,
@@ -265,95 +263,13 @@ export function useFractionalize() {
         microLamports: 1,
       });
 
-      // 13. Create and extend Address Lookup Table in a single transaction to reduce wallet approvals
-      // This combines create + extend into one transaction (reduces from 3 approvals to 2)
-      const slot = await connectionForProvider.getSlot();
-      const [createLookupTableIx, lookupTableAddress] =
-        AddressLookupTableProgram.createLookupTable({
-          authority: publicKey,
-          payer: publicKey,
-          recentSlot: slot - 1,
-        });
-
-      // Add all accounts to lookup table
-      const lookupTableAddresses = [
-        publicKey,
-        vaultPda,
-        mintAuthorityPda,
-        fractionMintPda,
-        metadataPda,
-        treasury,
-        nftAssetIdWeb3,
-        merkleTreeIdWeb3,
-        treeAuthority,
-        ...(leafDelegateWeb3 ? [leafDelegateWeb3] : []),
-        SPL_ACCOUNT_COMPRESSION_PROGRAM_ID_V1,
-        SPL_NOOP_PROGRAM_ID_V1,
-        ...proofAccounts.map(acc => acc.pubkey),
-      ];
-
-      const extendLookupTableIx = AddressLookupTableProgram.extendLookupTable({
-        payer: publicKey,
-        authority: publicKey,
-        lookupTable: lookupTableAddress,
-        addresses: lookupTableAddresses,
-      });
-
-      // Combine create + extend into a single transaction
-      const createAndExtendLookupTableTx = new TransactionMessage({
-        payerKey: publicKey,
-        recentBlockhash: blockhash,
-        instructions: [createLookupTableIx, extendLookupTableIx],
-      }).compileToV0Message();
-
-      const createAndExtendVersionedTx = new VersionedTransaction(createAndExtendLookupTableTx);
-      const signedCreateAndExtendTx = await signTransaction!(createAndExtendVersionedTx);
-      
-      // Handle different return types from signTransaction
-      let serializedCreateAndExtendTx: Uint8Array;
-      const signedTxAny = signedCreateAndExtendTx as any;
-      if (signedTxAny instanceof VersionedTransaction) {
-        serializedCreateAndExtendTx = signedTxAny.serialize();
-      } else if (signedTxAny instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(signedTxAny))) {
-        serializedCreateAndExtendTx = signedTxAny;
-      } else if (typeof signedTxAny?.serialize === 'function') {
-        serializedCreateAndExtendTx = signedTxAny.serialize();
-      } else {
-        console.error("Unknown signedCreateAndExtendTx type:", typeof signedCreateAndExtendTx);
-        throw new Error(`Unable to serialize create and extend lookup table transaction. Received type: ${typeof signedCreateAndExtendTx}`);
-      }
-      
-      const createAndExtendTxSignature = await connectionForProvider.sendRawTransaction(serializedCreateAndExtendTx);
-      await connectionForProvider.confirmTransaction({
-        signature: createAndExtendTxSignature,
-        blockhash,
-        lastValidBlockHeight,
-      });
-
-      // Wait for lookup table to be activated and get fresh blockhash
-      // Wait a bit for the lookup table to be activated
-      let lookupTableAccount = await connectionForProvider.getAddressLookupTable(lookupTableAddress);
-      let retries = 0;
-      while (!lookupTableAccount && retries < 10) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        lookupTableAccount = await connectionForProvider.getAddressLookupTable(lookupTableAddress);
-        retries++;
-      }
-      
-      if (!lookupTableAccount || !lookupTableAccount.value) {
-        throw new Error("Failed to fetch lookup table");
-      }
-
-      // Get fresh blockhash for fractionalization transaction
-      const { blockhash: freshBlockhash, lastValidBlockHeight: freshLastValidBlockHeight } = 
-        await connectionForProvider.getLatestBlockhash();
-
-      // 14. Build fractionalization transaction using lookup table
+      // 13. Build versioned transaction with remaining accounts (no lookup table needed)
+      // With tree depth 14 and canopy 8, we get max 6 proofs which fit in remaining_accounts
       const messageV0 = new TransactionMessage({
         payerKey: publicKey,
-        recentBlockhash: freshBlockhash,
+        recentBlockhash: blockhash,
         instructions: [computeBudgetIx, computePriceIx, fractionalizeIx],
-      }).compileToV0Message([lookupTableAccount.value]);
+      }).compileToV0Message();
 
       const versionedTx = new VersionedTransaction(messageV0);
 
@@ -486,8 +402,8 @@ export function useFractionalize() {
       
       await connectionForProvider.confirmTransaction({
         signature: txSignature,
-        blockhash: freshBlockhash,
-        lastValidBlockHeight: freshLastValidBlockHeight,
+        blockhash,
+        lastValidBlockHeight,
       });
 
       setSignature(txSignature);

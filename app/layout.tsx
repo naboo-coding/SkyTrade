@@ -4,6 +4,7 @@ import "./globals.css";
 import { NetworkProvider } from "@/contexts/NetworkContext";
 import { WalletProvider } from "@/components/WalletProvider";
 import { UmiProvider } from "@/components/UmiProvider";
+import { ToastProvider } from "@/components/ToastContainer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,7 +23,9 @@ export default function RootLayout({
       <body className={inter.className}>
         <NetworkProvider>
           <WalletProvider>
-            <UmiProvider>{children}</UmiProvider>
+            <UmiProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </UmiProvider>
           </WalletProvider>
         </NetworkProvider>
       </body>

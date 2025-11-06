@@ -51,12 +51,38 @@ export function useAssetById() {
         const metadata = assetData.content?.metadata || {};
         const files = assetData.content?.files || [];
 
+        // Try to get image from multiple sources
+        let imageUrl: string | undefined;
+        
+        // First, try files array
+        if (files && files.length > 0) {
+          imageUrl = (files[0]?.uri || files[0]?.cdn_uri) as string | undefined;
+        }
+        
+        // If no image from files, try to fetch from metadata URI
+        if (!imageUrl && metadata.uri) {
+          try {
+            const metadataResponse = await fetch(metadata.uri as string);
+            if (metadataResponse.ok) {
+              const metadataJson = await metadataResponse.json();
+              imageUrl = metadataJson.image || metadataJson.image_url || metadataJson.imageUrl;
+            }
+          } catch (err) {
+            console.warn(`Failed to fetch metadata from ${metadata.uri}:`, err);
+          }
+        }
+        
+        // Fallback to metadata.image if available
+        if (!imageUrl && metadata.image) {
+          imageUrl = metadata.image as string;
+        }
+
         const fetchedAsset: Asset = {
           id: assetData.id,
           name: metadata.name || "Unnamed Asset",
           symbol: metadata.symbol,
           uri: metadata.uri as string | undefined,
-          image: (files[0]?.uri || metadata.uri) as string | undefined,
+          image: imageUrl,
           owner: assetData.ownership?.owner || "",
           compressed: assetData.compression?.compressed === true,
         };
