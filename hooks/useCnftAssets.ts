@@ -602,7 +602,7 @@ export function useCnftAssets() {
           
           // For now, use stored timestamp if available, otherwise null (will be set when promise resolves)
           const storedTimestamp = getAssetCreationTime(asset.id);
-          const createdAt = storedTimestamp || Date.now(); // Temporary fallback
+          const createdAt = storedTimestamp ?? Date.now(); // Temporary fallback
           const createdAtDate = new Date(createdAt);
           
           const assetData: CnftAsset = {
@@ -767,7 +767,7 @@ export function useCnftAssets() {
           if (storedAsset) {
             // Ensure creation timestamp is set
             if (!storedAsset.createdAt) {
-              storedAsset.createdAt = getAssetCreationTime(assetId);
+              storedAsset.createdAt = getAssetCreationTime(assetId) ?? undefined;
             }
             allManualAssetsFromRef.push(storedAsset);
             console.log(`✅ Including manually added asset from ref: ${assetId.slice(0, 16)}... (${storedAsset.name})`);
@@ -777,7 +777,7 @@ export function useCnftAssets() {
             if (fromState) {
               // Ensure creation timestamp is set
               if (!fromState.createdAt) {
-                fromState.createdAt = getAssetCreationTime(assetId);
+                fromState.createdAt = getAssetCreationTime(assetId) ?? undefined;
               }
               // Store it in ref for next time
               manuallyAddedAssetsRef.current.set(assetId, fromState);
@@ -1047,7 +1047,7 @@ export function useCnftAssets() {
       }
       
       // Get or create creation timestamp for manually added asset
-      const createdAt = getAssetCreationTime(assetData.id);
+      const createdAt = getAssetCreationTime(assetData.id) ?? Date.now();
       const createdAtDate = new Date(createdAt);
       
       const newAsset: CnftAsset = {
