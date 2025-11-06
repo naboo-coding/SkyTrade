@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Connection } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 import umiWithCurrentWalletAdapter from "@/lib/umi/umiWithCurrentWalletAdapter";
 import { useNetwork } from "@/contexts/NetworkContext";
@@ -14,6 +14,7 @@ interface CnftAsset {
   uri?: string;
   image?: string;
   owner: string;
+  createdAt?: number; // Timestamp in milliseconds
 }
 
 export function useCnftAssets() {
@@ -47,6 +48,172 @@ export function useCnftAssets() {
         console.error("Failed to load deleted NFT IDs from localStorage:", err);
       }
     }
+  }, []);
+
+  // Helper function to format time ago
+  const getTimeAgo = (timestamp: number): string => {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    return `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
+  };
+
+  // Helper function to get creation time using Solana RPC getSignaturesForAddress
+  const getCreationTimeFromRPC = async (assetId: string, endpoint: string): Promise<number | null> => {
+    try {
+      if (!endpoint) {
+        console.log(`⚠️ [${assetId.slice(0, 8)}...] RPC endpoint not available`);
+        return null;
+      }
+
+      console.log(`🔍 [${assetId.slice(0, 8)}...] Fetching transaction signatures from RPC...`);
+      
+      // Create a Solana Connection to use native RPC methods
+      const connection = new Connection(endpoint, 'confirmed');
+      
+      // Get transaction signatures for the asset address
+      // The first signature should be the mint transaction
+      const publicKey = new PublicKey(assetId);
+      const signatures = await connection.getSignaturesForAddress(publicKey, {
+        limit: 1, // Only need the first (oldest) transaction
+      });
+
+      if (!signatures || signatures.length === 0) {
+        console.log(`⚠️ [${assetId.slice(0, 8)}...] No transaction signatures found`);
+        return null;
+      }
+
+      // Get the first (oldest) transaction signature
+      const firstSignature = signatures[0];
+      if (!firstSignature || !firstSignature.blockTime) {
+        console.log(`⚠️ [${assetId.slice(0, 8)}...] First transaction has no blockTime`);
+        return null;
+      }
+
+      // blockTime is in seconds, convert to milliseconds
+      const timestamp = firstSignature.blockTime * 1000;
+      console.log(`✅ [${assetId.slice(0, 8)}...] Found creation time from RPC: ${timestamp} (${new Date(timestamp).toLocaleString()})`);
+      return timestamp;
+    } catch (err: any) {
+      console.error(`❌ [${assetId.slice(0, 8)}...] Error fetching from RPC:`, err?.message || err);
+      return null;
+    }
+  };
+
+
+  // Helper function to extract blockchain creation time from asset
+  // For compressed NFTs, the best method is to get the timestamp from the merkle tree
+  const extractBlockchainCreationTime = async (asset: any, umi: any, endpoint: string): Promise<number | null> => {
+    try {
+      const assetId = asset.id?.slice(0, 8) || 'unknown';
+      
+      // For compressed NFTs, get timestamp from the merkle tree (most reliable method)
+      if (asset.compression?.tree) {
+        try {
+          const treeTimestamp = await getCreationTimeFromRPC(asset.compression.tree, endpoint);
+          if (treeTimestamp) {
+            console.log(`✅ [${assetId}] Found timestamp from merkle tree`);
+            return treeTimestamp;
+          }
+        } catch (treeErr: any) {
+          // Tree lookup failed, continue to fallback methods
+        }
+      }
+      
+      // Fallback: Try to get block time from slot if available
+      const compression = asset.compression;
+      if (compression) {
+        const slot = compression.slot || asset.slot;
+        if (slot && umi) {
+          try {
+            const blockTime = await umi.rpc.getBlockTime(slot);
+            if (blockTime !== null && blockTime !== undefined) {
+              const timestamp = blockTime * 1000;
+              console.log(`✅ [${assetId}] Got block time from slot ${slot}`);
+              return timestamp;
+            }
+          } catch (slotErr: any) {
+            // Slot lookup failed, continue to next method
+          }
+        }
+      }
+      
+      // Last resort: Check for direct timestamp fields (unlikely for compressed NFTs)
+      if (asset.created_at !== undefined) {
+        if (typeof asset.created_at === 'number') {
+          return asset.created_at;
+        }
+        if (typeof asset.created_at === 'string') {
+          const parsed = Date.parse(asset.created_at);
+          if (!isNaN(parsed)) return parsed;
+        }
+      }
+      
+      if (asset.compression?.created_at !== undefined) {
+        if (typeof asset.compression.created_at === 'number') {
+          return asset.compression.created_at;
+        }
+        if (typeof asset.compression.created_at === 'string') {
+          const parsed = Date.parse(asset.compression.created_at);
+          if (!isNaN(parsed)) return parsed;
+        }
+      }
+      
+      return null;
+    } catch (err) {
+      console.error(`❌ Error extracting blockchain creation time for ${asset.id?.slice(0, 8)}...:`, err);
+      return null;
+    }
+  };
+
+  // Helper function to save creation timestamp for an asset
+  const saveAssetCreationTime = useCallback((assetId: string, timestamp: number) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    
+    try {
+      const saved = localStorage.getItem("nft-creation-times");
+      const times = saved ? (JSON.parse(saved) as Record<string, number>) : {};
+      // Only save if we don't already have a timestamp (preserve first seen time)
+      if (!times[assetId]) {
+        times[assetId] = timestamp;
+        localStorage.setItem("nft-creation-times", JSON.stringify(times));
+        console.log(`💾 Saved creation time for ${assetId.slice(0, 8)}...: ${new Date(timestamp).toLocaleString()}`);
+      }
+    } catch (err) {
+      console.error("Failed to save creation time to localStorage:", err);
+    }
+  }, []);
+
+  // Helper function to get creation timestamp for an asset
+  // Returns null if no stored timestamp exists (don't create new ones with Date.now())
+  const getAssetCreationTime = useCallback((assetId: string): number | null => {
+    if (typeof window === "undefined") {
+      return null; // Don't create timestamps on server
+    }
+    
+    try {
+      const saved = localStorage.getItem("nft-creation-times");
+      if (saved) {
+        const times = JSON.parse(saved) as Record<string, number>;
+        if (times[assetId]) {
+          return times[assetId];
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load creation time from localStorage:", err);
+    }
+    
+    // Don't create new timestamps - return null and let blockchain extraction handle it
+    return null;
   }, []);
 
   // Save deleted asset IDs to localStorage whenever they change
@@ -326,6 +493,7 @@ export function useCnftAssets() {
       // Filter for compressed NFTs (cNFTs) only
       const cnfts: CnftAsset[] = [];
       const metadataFetchPromises: Promise<void>[] = [];
+      const timestampPromises: Array<{ assetId: string; promise: Promise<number> }> = [];
       
       // First pass: collect all assets and prepare metadata fetches
       for (const asset of response.items || []) {
@@ -362,6 +530,16 @@ export function useCnftAssets() {
             fullContent: JSON.stringify(asset.content, null, 2).slice(0, 500)
           });
           
+          // Log ALL available fields in the asset object to find timestamp
+          console.log("🔍 Full asset object keys:", Object.keys(asset));
+          console.log("🔍 Asset ownership:", asset.ownership);
+          console.log("🔍 Asset compression:", asset.compression);
+          if (asset.royalty) console.log("🔍 Asset royalty:", asset.royalty);
+          if (asset.authorities) console.log("🔍 Asset authorities:", asset.authorities);
+          if (asset.supply) console.log("🔍 Asset supply:", asset.supply);
+          // Log the entire asset structure (truncated) to see all available fields
+          console.log("🔍 Complete asset structure (first 2000 chars):", JSON.stringify(asset, null, 2).slice(0, 2000));
+          
           const metadata = asset.content?.metadata || {};
           const files = asset.content?.files || [];
           
@@ -393,6 +571,40 @@ export function useCnftAssets() {
           }
           
           // If no image yet, we'll fetch from metadata URI in parallel
+          // Try to extract blockchain creation time first, fallback to stored time only
+          // Create promise to extract blockchain timestamp
+          const timestampPromise = extractBlockchainCreationTime(asset, umi, endpoint).then(blockchainCreatedAt => {
+            if (blockchainCreatedAt) {
+              // Use blockchain creation time
+              console.log(`✅ [${asset.id.slice(0, 8)}...] Using blockchain creation time: ${new Date(blockchainCreatedAt).toLocaleString()}`);
+              // Save it to localStorage so we don't lose it
+              saveAssetCreationTime(asset.id, blockchainCreatedAt);
+              return blockchainCreatedAt;
+            } else {
+              // Check if we have a stored timestamp (from previous blockchain extraction)
+              const storedTime = getAssetCreationTime(asset.id);
+              if (storedTime) {
+                console.log(`⚠️ [${asset.id.slice(0, 8)}...] No blockchain timestamp found, using stored time: ${new Date(storedTime).toLocaleString()}`);
+                return storedTime;
+              } else {
+                // No blockchain timestamp and no stored timestamp - use current time as last resort
+                // This should only happen for very new NFTs that haven't been indexed yet
+                const fallbackTime = Date.now();
+                console.log(`⚠️ [${asset.id.slice(0, 8)}...] No blockchain or stored timestamp, using current time (last resort): ${new Date(fallbackTime).toLocaleString()}`);
+                // Don't save this to localStorage - we want to try blockchain extraction again next time
+                return fallbackTime;
+              }
+            }
+          });
+          
+          // Store the promise to resolve later
+          timestampPromises.push({ assetId: asset.id, promise: timestampPromise });
+          
+          // For now, use stored timestamp if available, otherwise null (will be set when promise resolves)
+          const storedTimestamp = getAssetCreationTime(asset.id);
+          const createdAt = storedTimestamp || Date.now(); // Temporary fallback
+          const createdAtDate = new Date(createdAt);
+          
           const assetData: CnftAsset = {
             id: asset.id,
             name: metadata.name || "Unnamed cNFT",
@@ -400,6 +612,7 @@ export function useCnftAssets() {
             uri: metadataUri,
             image: imageUrl,
             owner: asset.ownership.owner,
+            createdAt,
           };
           
           console.log("📦 Created assetData:", {
@@ -408,6 +621,14 @@ export function useCnftAssets() {
             hasImage: !!assetData.image,
             imageUrl: assetData.image?.slice(0, 50) + "..." || "none",
             hasUri: !!assetData.uri
+          });
+          
+          // Debug output for creation timestamp
+          console.log(`🕐 NFT Creation Time - ${assetData.name} (${assetData.id.slice(0, 8)}...):`, {
+            timestamp: createdAt,
+            date: createdAtDate.toISOString(),
+            readable: createdAtDate.toLocaleString(),
+            timeAgo: getTimeAgo(createdAt)
           });
           
           // Store index for updating after fetch
@@ -463,33 +684,56 @@ export function useCnftAssets() {
         }
       }
       
-      // Wait for all metadata fetches to complete and update images
+      // Wait for all metadata fetches and timestamp extractions to complete
       let finalCnfts = cnfts;
       console.log(`🔄 Starting metadata fetch for ${metadataFetchPromises.length} assets...`);
-      if (metadataFetchPromises.length > 0) {
-        const results = await Promise.allSettled(metadataFetchPromises);
+      console.log(`🔄 Starting timestamp extraction for ${timestampPromises.length} assets...`);
+      
+      // Wait for both metadata and timestamp promises
+      const allPromises = [
+        ...metadataFetchPromises,
+        ...timestampPromises.map(({ assetId, promise }) => 
+          promise.then(timestamp => {
+            // Update the asset with the correct timestamp
+            const asset = cnfts.find(a => a.id === assetId);
+            if (asset) {
+              asset.createdAt = timestamp;
+              console.log(`✅ Updated timestamp for ${assetId.slice(0, 8)}...: ${new Date(timestamp).toLocaleString()}`);
+            }
+          })
+        )
+      ];
+      
+      if (allPromises.length > 0) {
+        const results = await Promise.allSettled(allPromises);
         // Log results for debugging
         const successful = results.filter(r => r.status === 'fulfilled').length;
         const failed = results.filter(r => r.status === 'rejected').length;
-        console.log(`📸 Metadata fetch complete: ${successful} successful, ${failed} failed`);
+        console.log(`📸 Metadata and timestamp fetch complete: ${successful} successful, ${failed} failed`);
         
-        // Create new array with updated images to ensure React detects changes
+        // Create new array with updated images and timestamps to ensure React detects changes
         // This is important because we mutated objects in the array
         finalCnfts = cnfts.map(asset => ({ ...asset }));
         
-        // Log to verify images
-        console.log(`📊 Final image status for ${finalCnfts.length} assets:`);
+        // Log to verify images and timestamps
+        console.log(`📊 Final status for ${finalCnfts.length} assets:`);
         finalCnfts.forEach((asset, idx) => {
           if (asset.image) {
             console.log(`  [${idx + 1}] ✅ ${asset.id.slice(0, 8)}... has image: ${asset.image.slice(0, 50)}...`);
           } else {
             console.log(`  [${idx + 1}] ⚠️ ${asset.id.slice(0, 8)}... has NO image`);
           }
+          if (asset.createdAt) {
+            console.log(`      Timestamp: ${new Date(asset.createdAt).toLocaleString()} (${getTimeAgo(asset.createdAt)})`);
+          }
         });
       } else {
-        console.log(`ℹ️ No metadata fetches needed - ${cnfts.length} assets processed`);
+        console.log(`ℹ️ No metadata or timestamp fetches needed - ${cnfts.length} assets processed`);
         finalCnfts.forEach((asset, idx) => {
           console.log(`  [${idx + 1}] ${asset.id.slice(0, 8)}... image: ${asset.image ? asset.image.slice(0, 50) + "..." : "NONE"}`);
+          if (asset.createdAt) {
+            console.log(`      Timestamp: ${new Date(asset.createdAt).toLocaleString()} (${getTimeAgo(asset.createdAt)})`);
+          }
         });
       }
 
@@ -521,12 +765,20 @@ export function useCnftAssets() {
           
           const storedAsset = manuallyAddedAssetsRef.current.get(assetId);
           if (storedAsset) {
+            // Ensure creation timestamp is set
+            if (!storedAsset.createdAt) {
+              storedAsset.createdAt = getAssetCreationTime(assetId);
+            }
             allManualAssetsFromRef.push(storedAsset);
             console.log(`✅ Including manually added asset from ref: ${assetId.slice(0, 16)}... (${storedAsset.name})`);
           } else {
             // If not in ref but in prevAssets, use that (fallback)
             const fromState = prevAssets.find(a => a.id === assetId);
             if (fromState) {
+              // Ensure creation timestamp is set
+              if (!fromState.createdAt) {
+                fromState.createdAt = getAssetCreationTime(assetId);
+              }
               // Store it in ref for next time
               manuallyAddedAssetsRef.current.set(assetId, fromState);
               allManualAssetsFromRef.push(fromState);
@@ -590,7 +842,26 @@ export function useCnftAssets() {
         console.log(`✅ Merged ${merged.length} assets: ${finalCnfts.length} from API + ${allManualAssets.length} manually added (${filteredCount} deleted)`);
         console.log("✅ Final merged asset IDs:", merged.map(a => a.id.slice(0, 16) + "..."));
         console.log("✅ Manual asset IDs that should be preserved:", Array.from(currentManualIds));
-        return merged;
+        
+        // Sort by creation time (newest first) - assets without createdAt will be sorted last
+        const sorted = merged.sort((a, b) => {
+          const timeA = a.createdAt || 0;
+          const timeB = b.createdAt || 0;
+          return timeB - timeA; // Descending order (newest first)
+        });
+        
+        // Debug output: Show sorted order with timestamps
+        console.log("\n📊 === NFT GALLERY SORTED ORDER (Newest First) ===");
+        sorted.forEach((asset, index) => {
+          const createdAt = asset.createdAt || 0;
+          const date = new Date(createdAt);
+          console.log(`  [${index + 1}] ${asset.name} (${asset.id.slice(0, 8)}...)`);
+          console.log(`      Created: ${date.toLocaleString()} (${getTimeAgo(createdAt)})`);
+          console.log(`      Timestamp: ${createdAt}`);
+        });
+        console.log("📊 === END SORTED ORDER ===\n");
+        
+        return sorted;
       });
       console.log(`Found ${finalCnfts.length} compressed NFTs out of ${response.items?.length || 0} total items`);
     } catch (err) {
@@ -628,7 +899,7 @@ export function useCnftAssets() {
     } finally {
       setLoading(false);
     }
-  }, [publicKey, wallet, endpoint, saveDeletedIdsToStorage]);
+  }, [publicKey, wallet, endpoint, saveDeletedIdsToStorage, getAssetCreationTime]);
 
   useEffect(() => {
     // Only fetch if we have a valid publicKey
@@ -775,6 +1046,10 @@ export function useCnftAssets() {
         imageUrl = metadata.image as string;
       }
       
+      // Get or create creation timestamp for manually added asset
+      const createdAt = getAssetCreationTime(assetData.id);
+      const createdAtDate = new Date(createdAt);
+      
       const newAsset: CnftAsset = {
         id: assetData.id,
         name: metadata.name || assetData.id.slice(0, 8) || "Unnamed cNFT",
@@ -782,7 +1057,16 @@ export function useCnftAssets() {
         uri: metadata.uri as string | undefined,
         image: imageUrl,
         owner: assetOwner || walletAddress || "",
+        createdAt,
       };
+      
+      // Debug output for manually added asset
+      console.log(`🕐 Manually Added NFT Creation Time - ${newAsset.name} (${newAsset.id.slice(0, 8)}...):`, {
+        timestamp: createdAt,
+        date: createdAtDate.toISOString(),
+        readable: createdAtDate.toLocaleString(),
+        timeAgo: getTimeAgo(createdAt)
+      });
 
       console.log("📦 Prepared asset to add:", {
         id: newAsset.id,
@@ -847,35 +1131,54 @@ export function useCnftAssets() {
         
         // Check if asset already exists in the filtered state
         const existingIndex = prevFiltered.findIndex(a => a.id === newAsset.id);
+        let updated: CnftAsset[];
+        
         if (existingIndex !== -1) {
           // If it exists, replace it with fresh data
           console.log(`✅ Asset exists, replacing with fresh data: ${newAsset.id.slice(0, 16)}...`);
-          const updated = [...prevFiltered];
+          updated = [...prevFiltered];
           updated[existingIndex] = newAsset; // Replace with fresh data
           console.log("✅ Replaced existing asset:", {
             count: updated.length,
             ids: updated.map(a => a.id.slice(0, 16) + "...")
           });
-          return updated;
+        } else {
+          // Asset doesn't exist yet, add it
+          console.log("✅ Adding new asset to gallery! New count will be:", prevFiltered.length + 1);
+          updated = [...prevFiltered, newAsset];
+          console.log("✅ Updated assets array AFTER add:", {
+            count: updated.length,
+            ids: updated.map(a => a.id.slice(0, 16) + "..."),
+            names: updated.map(a => a.name),
+            manualAssetIds: Array.from(manuallyAddedAssetIdsRef.current),
+            newAssetId: newAsset.id.slice(0, 16) + "...",
+            newAssetName: newAsset.name
+          });
         }
         
-        // Asset doesn't exist yet, add it
-        console.log("✅ Adding new asset to gallery! New count will be:", prevFiltered.length + 1);
-        const updated = [...prevFiltered, newAsset];
-        console.log("✅ Updated assets array AFTER add:", {
-          count: updated.length,
-          ids: updated.map(a => a.id.slice(0, 16) + "..."),
-          names: updated.map(a => a.name),
-          manualAssetIds: Array.from(manuallyAddedAssetIdsRef.current),
-          newAssetId: newAsset.id.slice(0, 16) + "...",
-          newAssetName: newAsset.name
+        // Sort by creation time (newest first)
+        const sorted = updated.sort((a, b) => {
+          const timeA = a.createdAt || 0;
+          const timeB = b.createdAt || 0;
+          return timeB - timeA; // Descending order (newest first)
         });
         
+        // Debug output: Show sorted order after manual add
+        console.log("\n📊 === NFT GALLERY AFTER MANUAL ADD (Newest First) ===");
+        sorted.forEach((asset, index) => {
+          const createdAt = asset.createdAt || 0;
+          const date = new Date(createdAt);
+          console.log(`  [${index + 1}] ${asset.name} (${asset.id.slice(0, 8)}...)`);
+          console.log(`      Created: ${date.toLocaleString()} (${getTimeAgo(createdAt)})`);
+          console.log(`      Timestamp: ${createdAt}`);
+        });
+        console.log("📊 === END SORTED ORDER ===\n");
+        
         // Final verification: ensure newAsset is in the result
-        const containsNewAsset = updated.some(a => a.id === newAsset.id);
+        const containsNewAsset = sorted.some(a => a.id === newAsset.id);
         console.log(`✅ Final verification - newAsset is in result: ${containsNewAsset}`);
         
-        return updated;
+        return sorted;
       });
       
       // Verify the state update happened correctly by checking after a brief delay
@@ -901,7 +1204,7 @@ export function useCnftAssets() {
       
       return { success: false, error: userError };
     }
-  }, [wallet, endpoint, publicKey, saveDeletedIdsToStorage]);
+  }, [wallet, endpoint, publicKey, saveDeletedIdsToStorage, getAssetCreationTime]);
 
   // Function to manually remove an asset from the gallery
   const removeAsset = useCallback((assetId: string) => {
@@ -933,3 +1236,4 @@ export function useCnftAssets() {
 
   return { assets, loading, error, refetch: fetchAssets, addAssetById, removeAsset };
 }
+
