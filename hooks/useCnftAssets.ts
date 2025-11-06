@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PublicKey, Connection } from "@solana/web3.js";
+import { PublicKey, Connection, ConfirmedSignatureInfo } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
 import umiWithCurrentWalletAdapter from "@/lib/umi/umiWithCurrentWalletAdapter";
 import { useNetwork } from "@/contexts/NetworkContext";
@@ -80,7 +80,7 @@ export function useCnftAssets() {
       // Get transaction signatures - they're returned in reverse chronological order (newest first)
       // We need to paginate backwards to find the oldest transaction
       let before: string | undefined = undefined;
-      let oldestSignature: { blockTime: number | null } | null = null;
+      let oldestSignature: ConfirmedSignatureInfo | null = null;
       const maxPages = 3; // Reduced from 10 to limit API calls and prevent 429 errors
       let pageCount = 0;
       
