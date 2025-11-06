@@ -21,6 +21,7 @@ import { PROGRAM_ID, MPL_BUBBLEGUM_ID, SPL_ACCOUNT_COMPRESSION_PROGRAM_ID_V1, SP
 import { useNetwork } from "@/contexts/NetworkContext";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import FractionalizationIdl from "../fractionalization.json";
+import type { Fractionalization } from "../fractionalization2";
 import * as anchor from "@coral-xyz/anchor";
 import { parseUserFriendlyError } from "@/utils/errorParser";
 
@@ -170,8 +171,8 @@ export function useFractionalize() {
         wallet.adapter as any,
         { commitment: "confirmed" }
       );
-      const program = new Program(
-        FractionalizationIdl as any,
+      const program = new Program<Fractionalization>(
+        FractionalizationIdl,
         provider
       );
 

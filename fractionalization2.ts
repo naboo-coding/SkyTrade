@@ -1,4 +1,10 @@
-{
+/**
+ * Program IDL in camelCase format in order to be used in JS/TS.
+ *
+ * Note that this is only a type helper and is not the actual IDL. The original
+ * IDL can be found at `fractionalization.json`.
+ */
+export type Fractionalization = {
   "address": "DM26SsAwF5NSGVWSebfaUBkYAG3ioLkfFnqt1Vr7pq2P",
   "metadata": {
     "name": "fractionalization",
@@ -8,7 +14,7 @@
   },
   "instructions": [
     {
-      "name": "cancel_reclaim_v1",
+      "name": "cancelReclaimV1",
       "discriminator": [
         222,
         82,
@@ -42,24 +48,24 @@
               },
               {
                 "kind": "arg",
-                "path": "nft_asset_id"
+                "path": "nftAssetId"
               }
             ]
           }
         },
         {
-          "name": "fraction_mint"
+          "name": "fractionMint"
         },
         {
-          "name": "user_fractioned_token_account",
+          "name": "userFractionedTokenAccount",
           "writable": true
         },
         {
-          "name": "usdc_mint",
+          "name": "usdcMint",
           "address": "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
         },
         {
-          "name": "user_usdc_account",
+          "name": "userUsdcAccount",
           "writable": true
         },
         {
@@ -69,7 +75,7 @@
           ]
         },
         {
-          "name": "treasury_usdc_account",
+          "name": "treasuryUsdcAccount",
           "writable": true,
           "pda": {
             "seeds": [
@@ -116,7 +122,7 @@
               },
               {
                 "kind": "account",
-                "path": "usdc_mint"
+                "path": "usdcMint"
               }
             ],
             "program": {
@@ -159,7 +165,7 @@
           }
         },
         {
-          "name": "compensation_escrow_authority",
+          "name": "compensationEscrowAuthority",
           "pda": {
             "seeds": [
               {
@@ -194,13 +200,13 @@
           }
         },
         {
-          "name": "token_escrow",
+          "name": "tokenEscrow",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "compensation_escrow_authority"
+                "path": "compensationEscrowAuthority"
               },
               {
                 "kind": "const",
@@ -241,7 +247,7 @@
               },
               {
                 "kind": "account",
-                "path": "fraction_mint"
+                "path": "fractionMint"
               }
             ],
             "program": {
@@ -284,27 +290,27 @@
           }
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
+          "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "nft_asset_id",
+          "name": "nftAssetId",
           "type": "pubkey"
         }
       ]
     },
     {
-      "name": "finalize_reclaim_v1",
+      "name": "finalizeReclaimV1",
       "discriminator": [
         150,
         78,
@@ -338,25 +344,25 @@
               },
               {
                 "kind": "arg",
-                "path": "nft_asset_id"
+                "path": "nftAssetId"
               }
             ]
           }
         },
         {
-          "name": "fraction_mint",
+          "name": "fractionMint",
           "writable": true
         },
         {
-          "name": "user_fractioned_token_account",
+          "name": "userFractionedTokenAccount",
           "writable": true
         },
         {
-          "name": "usdc_mint",
+          "name": "usdcMint",
           "address": "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
         },
         {
-          "name": "user_usdc_account",
+          "name": "userUsdcAccount",
           "writable": true
         },
         {
@@ -366,7 +372,7 @@
           ]
         },
         {
-          "name": "treasury_usdc_account",
+          "name": "treasuryUsdcAccount",
           "writable": true,
           "pda": {
             "seeds": [
@@ -413,7 +419,7 @@
               },
               {
                 "kind": "account",
-                "path": "usdc_mint"
+                "path": "usdcMint"
               }
             ],
             "program": {
@@ -456,7 +462,7 @@
           }
         },
         {
-          "name": "compensation_escrow_authority",
+          "name": "compensationEscrowAuthority",
           "pda": {
             "seeds": [
               {
@@ -491,13 +497,13 @@
           }
         },
         {
-          "name": "compensation_escrow",
+          "name": "compensationEscrow",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "compensation_escrow_authority"
+                "path": "compensationEscrowAuthority"
               },
               {
                 "kind": "const",
@@ -538,7 +544,7 @@
               },
               {
                 "kind": "account",
-                "path": "usdc_mint"
+                "path": "usdcMint"
               }
             ],
             "program": {
@@ -581,7 +587,7 @@
           }
         },
         {
-          "name": "token_escrow",
+          "name": "tokenEscrow",
           "docs": [
             "Token escrow ATA holding the locked fractions (authority = compensation_escrow_authority PDA)"
           ],
@@ -590,7 +596,7 @@
             "seeds": [
               {
                 "kind": "account",
-                "path": "compensation_escrow_authority"
+                "path": "compensationEscrowAuthority"
               },
               {
                 "kind": "const",
@@ -631,7 +637,7 @@
               },
               {
                 "kind": "account",
-                "path": "fraction_mint"
+                "path": "fractionMint"
               }
             ],
             "program": {
@@ -674,49 +680,49 @@
           }
         },
         {
-          "name": "raydium_pool"
+          "name": "raydiumPool"
         },
         {
-          "name": "observation_state"
+          "name": "observationState"
         },
         {
-          "name": "bubblegum_program",
+          "name": "bubblegumProgram",
           "address": "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
         },
         {
-          "name": "compression_program"
+          "name": "compressionProgram"
         },
         {
-          "name": "merkle_tree",
+          "name": "merkleTree",
           "writable": true
         },
         {
-          "name": "tree_authority",
+          "name": "treeAuthority",
           "writable": true
         },
         {
-          "name": "leaf_delegate",
+          "name": "leafDelegate",
           "optional": true
         },
         {
-          "name": "log_wrapper"
+          "name": "logWrapper"
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
+          "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "nft_asset_id",
+          "name": "nftAssetId",
           "type": "pubkey"
         },
         {
@@ -729,7 +735,7 @@
           }
         },
         {
-          "name": "data_hash",
+          "name": "dataHash",
           "type": {
             "array": [
               "u8",
@@ -738,7 +744,7 @@
           }
         },
         {
-          "name": "creator_hash",
+          "name": "creatorHash",
           "type": {
             "array": [
               "u8",
@@ -757,7 +763,7 @@
       ]
     },
     {
-      "name": "fractionalize_v1",
+      "name": "fractionalizeV1",
       "discriminator": [
         182,
         190,
@@ -797,13 +803,13 @@
               },
               {
                 "kind": "account",
-                "path": "nft_asset"
+                "path": "nftAsset"
               }
             ]
           }
         },
         {
-          "name": "mint_authority",
+          "name": "mintAuthority",
           "docs": [
             "Mint authority PDA - Can mint/burn fractions"
           ],
@@ -836,7 +842,7 @@
           }
         },
         {
-          "name": "fraction_mint",
+          "name": "fractionMint",
           "docs": [
             "Fraction mint PDA with SPL token metadata. Its mint authority is held by the program."
           ],
@@ -869,7 +875,7 @@
           }
         },
         {
-          "name": "metadata_account",
+          "name": "metadataAccount",
           "docs": [
             "Metadata account for the fraction mint",
             "Validated in the instruction and only used for CPI to mpl_token_metadata"
@@ -877,7 +883,7 @@
           "writable": true
         },
         {
-          "name": "fractionalizer_token_account",
+          "name": "fractionalizerTokenAccount",
           "docs": [
             "Fractionalizer's token account - receives net supply (total_supply - protocol fee)",
             "init_if_needed, same decimals as fraction mint (9)"
@@ -928,7 +934,7 @@
               },
               {
                 "kind": "account",
-                "path": "fraction_mint"
+                "path": "fractionMint"
               }
             ],
             "program": {
@@ -977,7 +983,7 @@
           ]
         },
         {
-          "name": "treasury_token_account",
+          "name": "treasuryTokenAccount",
           "docs": [
             "Treasure token account - receives protocol fee in the form of the fraction tokens of the total supply minted",
             "init_if_needed, same decimals as fraction mint (9)"
@@ -1028,7 +1034,7 @@
               },
               {
                 "kind": "account",
-                "path": "fraction_mint"
+                "path": "fractionMint"
               }
             ],
             "program": {
@@ -1071,76 +1077,76 @@
           }
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "docs": [
             "Token programs & system program."
           ],
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
+          "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         },
         {
-          "name": "bubblegum_program",
+          "name": "bubblegumProgram",
           "address": "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
         },
         {
-          "name": "compression_program"
+          "name": "compressionProgram"
         },
         {
-          "name": "nft_asset",
+          "name": "nftAsset",
           "writable": true
         },
         {
-          "name": "merkle_tree",
+          "name": "merkleTree",
           "writable": true
         },
         {
-          "name": "tree_authority",
+          "name": "treeAuthority",
           "writable": true
         },
         {
-          "name": "leaf_delegate",
+          "name": "leafDelegate",
           "optional": true
         },
         {
-          "name": "log_wrapper"
+          "name": "logWrapper"
         },
         {
-          "name": "token_metadata_program",
+          "name": "tokenMetadataProgram",
           "address": "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
         }
       ],
       "args": [
         {
-          "name": "total_supply",
+          "name": "totalSupply",
           "type": "u64"
         },
         {
-          "name": "min_lp_age_seconds",
+          "name": "minLpAgeSeconds",
           "type": {
             "option": "i64"
           }
         },
         {
-          "name": "min_reclaim_percent",
+          "name": "minReclaimPercent",
           "type": {
             "option": "u8"
           }
         },
         {
-          "name": "min_liquidity_percent",
+          "name": "minLiquidityPercent",
           "type": {
             "option": "u8"
           }
         },
         {
-          "name": "min_volume_percent_30d",
+          "name": "minVolumePercent30d",
           "type": {
             "option": "u8"
           }
@@ -1155,7 +1161,7 @@
           }
         },
         {
-          "name": "data_hash",
+          "name": "dataHash",
           "type": {
             "array": [
               "u8",
@@ -1164,7 +1170,7 @@
           }
         },
         {
-          "name": "creator_hash",
+          "name": "creatorHash",
           "type": {
             "array": [
               "u8",
@@ -1181,21 +1187,21 @@
           "type": "u32"
         },
         {
-          "name": "cnft_name",
+          "name": "cnftName",
           "type": "string"
         },
         {
-          "name": "cnft_symbol",
+          "name": "cnftSymbol",
           "type": "string"
         },
         {
-          "name": "cnft_uri",
+          "name": "cnftUri",
           "type": "string"
         }
       ]
     },
     {
-      "name": "initialize_reclaim_v1",
+      "name": "initializeReclaimV1",
       "discriminator": [
         28,
         52,
@@ -1229,21 +1235,21 @@
               },
               {
                 "kind": "arg",
-                "path": "nft_asset_id"
+                "path": "nftAssetId"
               }
             ]
           }
         },
         {
-          "name": "fraction_mint",
+          "name": "fractionMint",
           "writable": true
         },
         {
-          "name": "user_fractioned_token_account",
+          "name": "userFractionedTokenAccount",
           "writable": true
         },
         {
-          "name": "compensation_escrow_authority",
+          "name": "compensationEscrowAuthority",
           "pda": {
             "seeds": [
               {
@@ -1278,13 +1284,13 @@
           }
         },
         {
-          "name": "token_escrow",
+          "name": "tokenEscrow",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "account",
-                "path": "compensation_escrow_authority"
+                "path": "compensationEscrowAuthority"
               },
               {
                 "kind": "const",
@@ -1325,7 +1331,7 @@
               },
               {
                 "kind": "account",
-                "path": "fraction_mint"
+                "path": "fractionMint"
               }
             ],
             "program": {
@@ -1368,43 +1374,43 @@
           }
         },
         {
-          "name": "bubblegum_program",
+          "name": "bubblegumProgram",
           "address": "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
         },
         {
-          "name": "compression_program"
+          "name": "compressionProgram"
         },
         {
-          "name": "merkle_tree",
+          "name": "merkleTree",
           "writable": true
         },
         {
-          "name": "tree_authority",
+          "name": "treeAuthority",
           "writable": true
         },
         {
-          "name": "leaf_delegate",
+          "name": "leafDelegate",
           "optional": true
         },
         {
-          "name": "log_wrapper"
+          "name": "logWrapper"
         },
         {
-          "name": "token_program",
+          "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
-          "name": "associated_token_program",
+          "name": "associatedTokenProgram",
           "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
         },
         {
-          "name": "system_program",
+          "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
         {
-          "name": "nft_asset_id",
+          "name": "nftAssetId",
           "type": "pubkey"
         },
         {
@@ -1417,7 +1423,7 @@
           }
         },
         {
-          "name": "data_hash",
+          "name": "dataHash",
           "type": {
             "array": [
               "u8",
@@ -1426,7 +1432,7 @@
           }
         },
         {
-          "name": "creator_hash",
+          "name": "creatorHash",
           "type": {
             "array": [
               "u8",
@@ -1447,7 +1453,7 @@
   ],
   "accounts": [
     {
-      "name": "Vault",
+      "name": "vault",
       "discriminator": [
         211,
         8,
@@ -1462,7 +1468,7 @@
   ],
   "events": [
     {
-      "name": "Fractionalized",
+      "name": "fractionalized",
       "discriminator": [
         56,
         18,
@@ -1475,7 +1481,7 @@
       ]
     },
     {
-      "name": "ProgramInitialized",
+      "name": "programInitialized",
       "discriminator": [
         43,
         70,
@@ -1488,7 +1494,7 @@
       ]
     },
     {
-      "name": "ReclaimCancelled",
+      "name": "reclaimCancelled",
       "discriminator": [
         45,
         203,
@@ -1501,7 +1507,7 @@
       ]
     },
     {
-      "name": "ReclaimFinalized",
+      "name": "reclaimFinalized",
       "discriminator": [
         17,
         84,
@@ -1514,7 +1520,7 @@
       ]
     },
     {
-      "name": "ReclaimInitiated",
+      "name": "reclaimInitiated",
       "discriminator": [
         209,
         100,
@@ -1527,7 +1533,7 @@
       ]
     },
     {
-      "name": "Redeemed",
+      "name": "redeemed",
       "discriminator": [
         14,
         29,
@@ -1540,7 +1546,7 @@
       ]
     },
     {
-      "name": "VaultClosed",
+      "name": "vaultClosed",
       "discriminator": [
         238,
         129,
@@ -1556,173 +1562,173 @@
   "errors": [
     {
       "code": 6000,
-      "name": "VaultNotActive",
+      "name": "vaultNotActive",
       "msg": "Vault is not active (already reclaimed or closed)"
     },
     {
       "code": 6001,
-      "name": "PoolTooYoung",
+      "name": "poolTooYoung",
       "msg": "Pool is too young"
     },
     {
       "code": 6002,
-      "name": "InsufficientTokens",
+      "name": "insufficientTokens",
       "msg": "Insufficient tokens for reclaim"
     },
     {
       "code": 6003,
-      "name": "InsufficientUsdcForCompensation",
+      "name": "insufficientUsdcForCompensation",
       "msg": "The user has NOT enough USDC for compensation"
     },
     {
       "code": 6004,
-      "name": "InvalidPool",
+      "name": "invalidPool",
       "msg": "Invalid Raydium pool (wrong program or mints)"
     },
     {
       "code": 6005,
-      "name": "WrongMint",
+      "name": "wrongMint",
       "msg": "Pool mint mismatch"
     },
     {
       "code": 6006,
-      "name": "InvalidPoolOwner",
+      "name": "invalidPoolOwner",
       "msg": "Pool account is not owned by Raydium CP-Swap program"
     },
     {
       "code": 6007,
-      "name": "VaultNotReclaimed",
+      "name": "vaultNotReclaimed",
       "msg": "Vault is not reclaimed"
     },
     {
       "code": 6008,
-      "name": "NoTokensToRedeem",
+      "name": "noTokensToRedeem",
       "msg": "No tokens to redeem"
     },
     {
       "code": 6009,
-      "name": "MathOverflow",
+      "name": "mathOverflow",
       "msg": "Math overflow"
     },
     {
       "code": 6010,
-      "name": "SupplyMismatch",
+      "name": "supplyMismatch",
       "msg": "Supply Mismatch"
     },
     {
       "code": 6011,
-      "name": "Unauthorized",
-      "msg": "Unauthorized"
+      "name": "unauthorized",
+      "msg": "unauthorized"
     },
     {
       "code": 6012,
-      "name": "InvalidSupply",
+      "name": "invalidSupply",
       "msg": "Invalid supply"
     },
     {
       "code": 6013,
-      "name": "EscrowNotEmpty",
+      "name": "escrowNotEmpty",
       "msg": "Escrow still holds USDC"
     },
     {
       "code": 6014,
-      "name": "InvalidFractionTokenAccount",
+      "name": "invalidFractionTokenAccount",
       "msg": "Token-account mint does not match expected fraction mint"
     },
     {
       "code": 6015,
-      "name": "InvalidUsdcTokenAccount",
+      "name": "invalidUsdcTokenAccount",
       "msg": "USDC token-account mint does not match expected USDC mint"
     },
     {
       "code": 6016,
-      "name": "InvalidOwner",
+      "name": "invalidOwner",
       "msg": "Token-account owner does not match signer"
     },
     {
       "code": 6017,
-      "name": "InvalidPoolAccountSize",
+      "name": "invalidPoolAccountSize",
       "msg": "Pool account size too small"
     },
     {
       "code": 6018,
-      "name": "InvalidObservationAccountSize",
+      "name": "invalidObservationAccountSize",
       "msg": "Observation account size too small"
     },
     {
       "code": 6019,
-      "name": "InvalidPoolData",
+      "name": "invalidPoolData",
       "msg": "Failed to deserialize pool data"
     },
     {
       "code": 6020,
-      "name": "InvalidObservationData",
+      "name": "invalidObservationData",
       "msg": "Failed to deserialize observation data"
     },
     {
       "code": 6021,
-      "name": "TwapWindowTooShort",
+      "name": "twapWindowTooShort",
       "msg": "On-chain TWAP window shorter than required minimum"
     },
     {
       "code": 6022,
-      "name": "InvalidPoolTokens",
+      "name": "invalidPoolTokens",
       "msg": "Invalid tokens in the Pool"
     },
     {
       "code": 6023,
-      "name": "InvalidNftAssetId",
+      "name": "invalidNftAssetId",
       "msg": "The provided nft_asset_id does not match the vault's stored asset ID"
     },
     {
       "code": 6024,
-      "name": "InsufficientTwapData",
+      "name": "insufficientTwapData",
       "msg": "Not enough observation for twap calculations"
     },
     {
       "code": 6025,
-      "name": "VaultNotInReclaimInitiated",
+      "name": "vaultNotInReclaimInitiated",
       "msg": "Vault is not in ReclaimInitiated status"
     },
     {
       "code": 6026,
-      "name": "EscrowPeriodNotEnded",
+      "name": "escrowPeriodNotEnded",
       "msg": "Escrow period has not ended yet"
     },
     {
       "code": 6027,
-      "name": "UnauthorizedFinalizer",
+      "name": "unauthorizedFinalizer",
       "msg": "Only the original reclaim initiator can finalize"
     },
     {
       "code": 6028,
-      "name": "UnauthorizedCancellation",
+      "name": "unauthorizedCancellation",
       "msg": "Only the original reclaim initiator can cancel"
     },
     {
       "code": 6029,
-      "name": "InsufficientUsdcForCancellationFee",
+      "name": "insufficientUsdcForCancellationFee",
       "msg": "Insufficient USDC balance to pay cancellation fee (100 USDC required)"
     },
     {
       "code": 6030,
-      "name": "InvalidTreasuryAccount",
+      "name": "invalidTreasuryAccount",
       "msg": "Invalid Treasury Account"
     },
     {
       "code": 6031,
-      "name": "PercentageFeeTooHigh",
+      "name": "percentageFeeTooHigh",
       "msg": "Percentage Fee can NOT be above 100%"
     },
     {
       "code": 6032,
-      "name": "InsufficientUsdcForReclaimFeeAndCompensation",
+      "name": "insufficientUsdcForReclaimFeeAndCompensation",
       "msg": "Insuficient USDC balance to pay both Reclaim Fee and Compensation"
     }
   ],
   "types": [
     {
-      "name": "Fractionalized",
+      "name": "fractionalized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1735,46 +1741,46 @@
             "type": "pubkey"
           },
           {
-            "name": "nft_asset_id",
+            "name": "nftAssetId",
             "type": "pubkey"
           },
           {
-            "name": "fraction_mint",
+            "name": "fractionMint",
             "type": "pubkey"
           },
           {
-            "name": "total_supply",
+            "name": "totalSupply",
             "type": "u64"
           },
           {
-            "name": "net_supply",
+            "name": "netSupply",
             "type": "u64"
           },
           {
-            "name": "fee_amount",
+            "name": "feeAmount",
             "type": "u64"
           },
           {
-            "name": "min_lp_age_seconds",
+            "name": "minLpAgeSeconds",
             "type": "i64"
           },
           {
-            "name": "min_reclaim_percentage",
+            "name": "minReclaimPercentage",
             "type": "u8"
           },
           {
-            "name": "min_liquidity_percent",
+            "name": "minLiquidityPercent",
             "type": "u8"
           },
           {
-            "name": "min_volume_percent_30d",
+            "name": "minVolumePercent30d",
             "type": "u8"
           },
           {
             "name": "status",
             "type": {
               "defined": {
-                "name": "VaultStatus"
+                "name": "vaultStatus"
               }
             }
           },
@@ -1786,7 +1792,7 @@
       }
     },
     {
-      "name": "ProgramInitialized",
+      "name": "programInitialized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1795,26 +1801,26 @@
             "type": "pubkey"
           },
           {
-            "name": "min_lp_age_seconds",
+            "name": "minLpAgeSeconds",
             "type": "i64"
           },
           {
-            "name": "min_reclaim_percentage",
+            "name": "minReclaimPercentage",
             "type": "u8"
           },
           {
-            "name": "min_liquidity_percent",
+            "name": "minLiquidityPercent",
             "type": "u8"
           },
           {
-            "name": "min_volume_percent_30d",
+            "name": "minVolumePercent30d",
             "type": "u8"
           }
         ]
       }
     },
     {
-      "name": "ReclaimCancelled",
+      "name": "reclaimCancelled",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1827,11 +1833,11 @@
             "type": "pubkey"
           },
           {
-            "name": "tokens_returned",
+            "name": "tokensReturned",
             "type": "u64"
           },
           {
-            "name": "cancellation_fee_paid",
+            "name": "cancellationFeePaid",
             "type": "u64"
           },
           {
@@ -1842,7 +1848,7 @@
       }
     },
     {
-      "name": "ReclaimFinalized",
+      "name": "reclaimFinalized",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1855,23 +1861,23 @@
             "type": "pubkey"
           },
           {
-            "name": "tokens_burned",
+            "name": "tokensBurned",
             "type": "u64"
           },
           {
-            "name": "twap_price",
+            "name": "twapPrice",
             "type": "u64"
           },
           {
-            "name": "total_compensation",
+            "name": "totalCompensation",
             "type": "u64"
           },
           {
-            "name": "minority_tokens",
+            "name": "minorityTokens",
             "type": "u64"
           },
           {
-            "name": "is_direct_reclaim",
+            "name": "isDirectReclaim",
             "type": "bool"
           },
           {
@@ -1882,7 +1888,7 @@
       }
     },
     {
-      "name": "ReclaimInitiated",
+      "name": "reclaimInitiated",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1895,15 +1901,15 @@
             "type": "pubkey"
           },
           {
-            "name": "tokens_locked",
+            "name": "tokensLocked",
             "type": "u64"
           },
           {
-            "name": "minority_tokens",
+            "name": "minorityTokens",
             "type": "u64"
           },
           {
-            "name": "escrow_ends_at",
+            "name": "escrowEndsAt",
             "type": "i64"
           },
           {
@@ -1914,7 +1920,7 @@
       }
     },
     {
-      "name": "Redeemed",
+      "name": "redeemed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -1927,11 +1933,11 @@
             "type": "pubkey"
           },
           {
-            "name": "tokens_burned",
+            "name": "tokensBurned",
             "type": "u64"
           },
           {
-            "name": "usdc_received",
+            "name": "usdcReceived",
             "type": "u64"
           },
           {
@@ -1942,7 +1948,7 @@
       }
     },
     {
-      "name": "Vault",
+      "name": "vault",
       "docs": [
         "One vault per fractionalised cNFT.",
         "Pool address is NOT stored; user supplies it at reclaim time."
@@ -1951,19 +1957,19 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "nft_mint",
+            "name": "nftMint",
             "type": "pubkey"
           },
           {
-            "name": "nft_asset_id",
+            "name": "nftAssetId",
             "type": "pubkey"
           },
           {
-            "name": "fraction_mint",
+            "name": "fractionMint",
             "type": "pubkey"
           },
           {
-            "name": "total_supply",
+            "name": "totalSupply",
             "type": "u64"
           },
           {
@@ -1971,31 +1977,31 @@
             "type": "pubkey"
           },
           {
-            "name": "creation_timestamp",
+            "name": "creationTimestamp",
             "type": "i64"
           },
           {
             "name": "status",
             "type": {
               "defined": {
-                "name": "VaultStatus"
+                "name": "vaultStatus"
               }
             }
           },
           {
-            "name": "reclaim_timestamp",
+            "name": "reclaimTimestamp",
             "type": "i64"
           },
           {
-            "name": "twap_price_at_reclaim",
+            "name": "twapPriceAtReclaim",
             "type": "u64"
           },
           {
-            "name": "total_compensation",
+            "name": "totalCompensation",
             "type": "u64"
           },
           {
-            "name": "remaining_compensation",
+            "name": "remainingCompensation",
             "type": "u64"
           },
           {
@@ -2003,38 +2009,38 @@
             "type": "u8"
           },
           {
-            "name": "min_lp_age_seconds",
+            "name": "minLpAgeSeconds",
             "type": "i64"
           },
           {
-            "name": "min_reclaim_percentage",
+            "name": "minReclaimPercentage",
             "type": "u8"
           },
           {
-            "name": "min_liquidity_percent",
+            "name": "minLiquidityPercent",
             "type": "u8"
           },
           {
-            "name": "min_volume_percent_30d",
+            "name": "minVolumePercent30d",
             "type": "u8"
           },
           {
-            "name": "reclaim_initiator",
+            "name": "reclaimInitiator",
             "type": "pubkey"
           },
           {
-            "name": "reclaim_initiation_timestamp",
+            "name": "reclaimInitiationTimestamp",
             "type": "i64"
           },
           {
-            "name": "tokens_in_escrow",
+            "name": "tokensInEscrow",
             "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "VaultClosed",
+      "name": "vaultClosed",
       "type": {
         "kind": "struct",
         "fields": [
@@ -2050,24 +2056,25 @@
       }
     },
     {
-      "name": "VaultStatus",
+      "name": "vaultStatus",
       "type": {
         "kind": "enum",
         "variants": [
           {
-            "name": "Active"
+            "name": "active"
           },
           {
-            "name": "ReclaimInitiated"
+            "name": "reclaimInitiated"
           },
           {
-            "name": "ReclaimedFinalized"
+            "name": "reclaimedFinalized"
           },
           {
-            "name": "Closed"
+            "name": "closed"
           }
         ]
       }
     }
   ]
-}
+};
+

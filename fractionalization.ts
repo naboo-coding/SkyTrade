@@ -2,7 +2,8 @@ require('dotenv').config();
 
 import * as anchor from "@coral-xyz/anchor";
 import { Program, EventParser } from "@coral-xyz/anchor";
-import Fractionalization from "./fractionalization.json";
+import FractionalizationIdl from "./fractionalization.json";
+import type { Fractionalization } from "./fractionalization2";
 import { createMerkleTreeV2, createCollection_V2, mintCnftV2, createMerkleTreeV1, createCollectionV1, mintCnftV1 } from "./helper";
 import {
   Keypair,
