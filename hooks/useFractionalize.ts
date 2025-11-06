@@ -236,7 +236,7 @@ export function useFractionalize() {
           nftAsset: nftAssetIdWeb3,
           merkleTree: merkleTreeIdWeb3,
           treeAuthority: treeAuthority,
-          ...(leafDelegateWeb3 && { leafDelegate: leafDelegateWeb3 }),
+          leafDelegate: leafDelegateWeb3 ?? null,
           compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID_V1,
           logWrapper: SPL_NOOP_PROGRAM_ID_V1,
           metadataAccount: metadataPda,
