@@ -366,12 +366,16 @@ describe("fractionalization", () => {
   //    */
   //   console.log("\n=== Prepare accounts and arguments for fractionalization instruction ===");
 
-  //   // Protocol fee treasury
-  //   const treasury = Keypair.generate();
-
   //   // Instruction arguments
-  //   const totalSupply = new anchor.BN(1_000_000);
-  //   const protocolPercentFee = 5;  // 5%
+  //   const totalSupply = new anchor.BN(1_000_000)
+  //     .mul(new anchor.BN(10)
+  //       .pow(new anchor.BN(9)));  // 1_000_000 * 10^9 decimals
+
+  //   // Treasury account (hardcoded in program)
+  //   const TREASURY_ACCOUNT = new PublicKey("tDeV8biSQiZCEdPvVmJ2fMNh5r7horSMgJ51mYi8HL5");
+  //   
+  //   // Fee percentage (hardcoded in program)
+  //   const FRACTIONALIZATION_FEE_PERCENTAGE = 5;  // 5%
 
   //   // Convert UMI PublicKey to Solana web3.js PublicKey
   //   const merkleTreeIdWeb3 = new PublicKey(assetWithProof.merkleTree)
@@ -416,7 +420,6 @@ describe("fractionalization", () => {
   //       null,                                                                                   // min_reclaim_percent as Option<u8>
   //       null,                                                                                   // min_liquidity_percent as Option<u8>
   //       null,                                                                                   // min_volume_percent_30d as Option<u8>
-  //       protocolPercentFee,                                                                     // protocol_percent_fee as u8
   //       Array.from(assetWithProof.root),                                                        // root as [u8; 32]
   //       Array.from(assetWithProof.dataHash),                                                    // data_hash as [u8; 32]
   //       Array.from(assetWithProof.creatorHash),                                                 // creator_hash as [u8; 32]
@@ -427,7 +430,7 @@ describe("fractionalization", () => {
   //     )
   //     .accounts({
   //       fractionalizer: payer.publicKey,
-  //       treasury: treasury.publicKey,
+  //       treasury: TREASURY_ACCOUNT,
   //       nftAsset: nftAssetIdWeb3,
   //       merkleTree: merkleTreeIdWeb3,
   //       treeAuthority: treeAuthority,
@@ -501,7 +504,7 @@ describe("fractionalization", () => {
   //   // Derive associated token account (ATA) for treasury to hold fractional tokens
   //   const treasuryATA = getAssociatedTokenAddressSync(
   //     fractionMintPda,
-  //     treasury.publicKey,
+  //     TREASURY_ACCOUNT,
   //     false,
   //     TOKEN_PROGRAM_ID,
   //     ASSOCIATED_TOKEN_PROGRAM_ID
@@ -519,7 +522,7 @@ describe("fractionalization", () => {
   //   expect(vaultAccount.status).to.deep.equal({ active: {} });
 
   //   // Token balances
-  //   const fee = totalSupply.muln(protocolPercentFee).divn(100);
+  //   const fee = totalSupply.muln(FRACTIONALIZATION_FEE_PERCENTAGE).divn(100);
   //   const net = totalSupply.sub(fee);
 
   //   const fractionalizerBalance = await provider.connection.getTokenAccountBalance(fractionalizerATA);
