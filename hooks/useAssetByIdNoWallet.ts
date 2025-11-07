@@ -37,6 +37,8 @@ export function useAssetByIdNoWallet() {
       const umi = createUmi(endpoint).use(dasApi());
 
       try {
+        // Add a small delay to prevent rate limiting when multiple assets are fetched
+        // This will be handled by the component-level debouncing
         const assetData = await umi.rpc.getAsset(publicKey(assetId));
 
         if (!assetData) {
@@ -91,6 +93,13 @@ export function useAssetByIdNoWallet() {
               });
               clearTimeout(timeoutId);
               
+              // Check for rate limit errors
+              if (metadataResponse.status === 429) {
+                console.warn(`Rate limited (429) when fetching metadata for ${assetId.slice(0, 8)}...`);
+                // Don't retry, just skip metadata fetch
+                throw new Error('Rate limited');
+              }
+              
               if (metadataResponse.ok) {
                 const metadataJson = await metadataResponse.json();
                 // Get image from metadata JSON
@@ -108,7 +117,12 @@ export function useAssetByIdNoWallet() {
               }
             } catch (err: any) {
               clearTimeout(timeoutId);
-              // Silently fail
+              const errorMsg = err?.message || String(err);
+              // Only log non-rate-limit errors
+              if (!errorMsg.includes('429') && !errorMsg.includes('Rate limited') && !errorMsg.includes('aborted')) {
+                console.debug(`Failed to fetch metadata for ${assetId.slice(0, 8)}...:`, errorMsg);
+              }
+              // Silently fail for rate limits and other errors
             }
           }
         }
@@ -132,6 +146,14 @@ export function useAssetByIdNoWallet() {
       } catch (fetchError: any) {
         const errorMsg = fetchError?.message || String(fetchError);
         const errorString = errorMsg.toLowerCase();
+        
+        // Handle rate limit errors gracefully
+        if (errorString.includes("429") || errorString.includes("rate limit") || errorString.includes("too many requests")) {
+          console.warn(`Rate limited (429) when fetching asset ${assetId.slice(0, 8)}...`);
+          setError("Rate limited. Please wait a moment and try again.");
+          setAsset(null);
+          return;
+        }
         
         if (errorString.includes("403") || errorString.includes("access forbidden") || errorString.includes("forbidden")) {
           const authError = "Helius DAS API access forbidden. Check your HELIUS_RPC_URL environment variable.";

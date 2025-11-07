@@ -162,11 +162,21 @@ export function useInitializeReclaim() {
         provider
       );
 
-      // Fetch asset with proof
+      // Fetch asset with proof (with rate limit handling)
       const umi = umiWithCurrentWalletAdapter();
-      const assetWithProof = await getAssetWithProof(umi, umiPublicKey(vault.nftAssetId.toBase58()), {
-        truncateCanopy: true,
-      });
+      let assetWithProof;
+      try {
+        assetWithProof = await getAssetWithProof(umi, umiPublicKey(vault.nftAssetId.toBase58()), {
+          truncateCanopy: true,
+        });
+      } catch (proofError: any) {
+        const errorMsg = proofError?.message || String(proofError);
+        // Check for rate limit errors
+        if (errorMsg.includes("429") || errorMsg.includes("rate limit") || errorMsg.includes("Too Many Requests")) {
+          throw new Error("Rate limited. Please wait a moment and try again. The server is temporarily limiting requests.");
+        }
+        throw proofError;
+      }
 
       if (!assetWithProof.proof || assetWithProof.proof.length === 0) {
         throw new Error("No merkle proof available for this asset");

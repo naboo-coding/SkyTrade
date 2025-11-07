@@ -19,7 +19,7 @@ const VAULTS_PER_PAGE = 10;
 
 export default function VaultExplorer() {
   const { vaults, loading, error, refetch } = useVaults();
-  const { balances, fetchBalances } = useTokenBalance();
+  const { balances, loading: balancesLoading, fetchBalances, updateBalance } = useTokenBalance();
   const { validateAssets, validatedAssets } = useAssetValidation();
   const [displayedCount, setDisplayedCount] = useState(VAULTS_PER_PAGE);
   const [initialized, setInitialized] = useState(false);
@@ -69,10 +69,20 @@ export default function VaultExplorer() {
   }, [vaults, showOnlyMine, publicKey, validatedAssets]);
 
   // Fetch balances when vaults change (only if wallet is connected)
+  // Initialize with empty balances immediately so UI can render
   useEffect(() => {
     if (filteredVaults.length > 0 && publicKey) {
       const fractionMints = filteredVaults.map((v) => v.fractionMint);
-      console.log(`Fetching balances for ${fractionMints.length} vaults, wallet: ${publicKey.toBase58()}`);
+      console.log(`[VaultExplorer] Fetching balances for ${fractionMints.length} vaults, wallet: ${publicKey.toBase58().slice(0, 8)}...`);
+      
+      // Initialize all balances to 0 immediately so UI renders
+      const initialBalances = new Map<string, bigint>();
+      fractionMints.forEach(mint => {
+        initialBalances.set(mint.toBase58(), BigInt(0));
+      });
+      // Don't set initial balances here - let them load incrementally
+      
+      // Start fetching balances (will update incrementally)
       fetchBalances(fractionMints);
       setInitialized(true);
     } else if (!publicKey) {
@@ -125,7 +135,7 @@ export default function VaultExplorer() {
     try {
       const signature = await initializeReclaim(vault);
       if (signature) {
-        // Fetch the NFT name from the asset
+        // Fetch the NFT name from the asset (with rate limit handling)
         let vaultName: string | undefined;
         try {
           const umi = createUmi(endpoint).use(dasApi());
@@ -137,19 +147,36 @@ export default function VaultExplorer() {
           // Try to get name from direct metadata first
           vaultName = metadata.name as string | undefined;
           
-          // If not found, try fetching from metadata URI
+          // If not found, try fetching from metadata URI (with rate limit protection)
           if (!vaultName && metadataUri) {
             try {
-              const response = await fetch(metadataUri, { mode: 'cors' });
-              if (response.ok) {
+              const response = await fetch(metadataUri, { 
+                mode: 'cors',
+              });
+              
+              // Check for rate limit errors
+              if (response.status === 429) {
+                console.warn(`Rate limited (429) when fetching metadata for vault ${vault.publicKey.toBase58().slice(0, 8)}...`);
+                // Skip metadata fetch, use fallback name
+              } else if (response.ok) {
                 const json = await response.json();
                 vaultName = json.name;
               }
-            } catch {
-              // Silently fail
+            } catch (err: any) {
+              const errorMsg = err?.message || String(err);
+              // Only log non-rate-limit errors
+              if (!errorMsg.includes('429') && !errorMsg.includes('Rate limited')) {
+                console.debug(`Failed to fetch metadata for vault:`, errorMsg);
+              }
+              // Silently fail for rate limits
             }
           }
-        } catch {
+        } catch (err: any) {
+          const errorMsg = err?.message || String(err);
+          // Check for rate limit errors
+          if (errorMsg.includes("429") || errorMsg.includes("rate limit") || errorMsg.includes("Too Many Requests")) {
+            console.warn(`Rate limited (429) when fetching asset for vault ${vault.publicKey.toBase58().slice(0, 8)}...`);
+          }
           // If we can't fetch the name, use a fallback
           vaultName = vault.nftAssetId ? `Vault ${vault.nftAssetId.toBase58().slice(0, 8)}...` : undefined;
         }
@@ -270,10 +297,17 @@ export default function VaultExplorer() {
                     console.log("Manual refresh: Fetching balances for", fractionMints.length, "vaults");
                     fetchBalances(fractionMints);
                   }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm"
-                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || balancesLoading}
                 >
-                  {loading ? "Refreshing..." : "Refresh Balances"}
+                  {loading || balancesLoading ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Refreshing...
+                    </span>
+                  ) : (
+                    "Refresh Balances"
+                  )}
                 </button>
               </>
             )}
@@ -281,16 +315,26 @@ export default function VaultExplorer() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {displayedVaults.map((vault) => {
-          const balance = balances.get(vault.fractionMint.toBase58()) || BigInt(0);
+          const balance = balances.get(vault.fractionMint.toBase58()) ?? BigInt(0);
+          const isThisVaultProcessing = processingVault === vault.publicKey.toBase58();
+          const hasBalance = balance > BigInt(0);
+          
+          // Debug logging
+          if (publicKey && hasBalance) {
+            console.log(`[VaultExplorer] Vault ${vault.publicKey.toBase58().slice(0, 8)}... has balance: ${balance.toString()}`);
+          }
+          
           return (
             <VaultCard
               key={vault.publicKey.toBase58()}
               vault={vault}
               userBalance={balance}
               onInitializeReclaim={handleInitializeReclaim}
-              isProcessing={processingVault === vault.publicKey.toBase58() || reclaimLoading}
+              isProcessing={isThisVaultProcessing && reclaimLoading}
+              balanceLoading={balancesLoading}
+              onBalanceUpdate={updateBalance}
             />
           );
         })}

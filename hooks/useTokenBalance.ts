@@ -28,10 +28,13 @@ export function useTokenBalance() {
   const [balances, setBalances] = useState<Map<string, bigint>>(new Map());
   const [loading, setLoading] = useState(false);
 
-  const fetchBalance = useCallback(async (fractionMint: PublicKey): Promise<bigint> => {
+  const fetchBalance = useCallback(async (fractionMint: PublicKey, retryCount = 0): Promise<bigint> => {
     if (!publicKey || !endpoint) {
       return BigInt(0);
     }
+
+    const maxRetries = 3;
+    const baseDelay = 500;
 
     try {
       const connection = new Connection(endpoint, "confirmed");
@@ -51,8 +54,19 @@ export function useTokenBalance() {
           console.log(`Found ${pdaAmount} tokens in PDA account for ${fractionMint.toBase58()}: ${pdaTokenAccount.toBase58()}`);
         }
       } catch (err: any) {
-        // PDA account doesn't exist, that's okay
         const errMsg = err?.message || String(err);
+        // Check for rate limit errors
+        if (errMsg.includes("429") || errMsg.includes("rate limit") || errMsg.includes("Too Many Requests")) {
+          if (retryCount < maxRetries) {
+            const delay = baseDelay * Math.pow(2, retryCount);
+            console.warn(`Rate limited (429) fetching balance for ${fractionMint.toBase58()}, retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return fetchBalance(fractionMint, retryCount + 1);
+          }
+          console.warn(`Rate limited (429) fetching balance for ${fractionMint.toBase58()}, max retries reached`);
+          return BigInt(0);
+        }
+        // PDA account doesn't exist, that's okay
         if (!errMsg.includes("Invalid param") && !errMsg.includes("not found") && !errMsg.includes("could not find account")) {
           console.warn(`Error checking PDA token account ${pdaTokenAccount.toBase58()} for ${fractionMint.toBase58()}:`, err);
         }
@@ -63,14 +77,31 @@ export function useTokenBalance() {
         const ataBalance = await connection.getTokenAccountBalance(regularATA);
         totalBalance += BigInt(ataBalance.value.amount);
       } catch (err: any) {
+        const errMsg = err?.message || String(err);
+        // Check for rate limit errors
+        if (errMsg.includes("429") || errMsg.includes("rate limit") || errMsg.includes("Too Many Requests")) {
+          if (retryCount < maxRetries) {
+            const delay = baseDelay * Math.pow(2, retryCount);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return fetchBalance(fractionMint, retryCount + 1);
+          }
+          return totalBalance; // Return what we have so far
+        }
         // ATA doesn't exist, that's okay
-        if (!err?.message?.includes("Invalid param") && !err?.message?.includes("not found")) {
+        if (!errMsg.includes("Invalid param") && !errMsg.includes("not found")) {
           console.warn(`Error checking ATA for ${fractionMint.toBase58()}:`, err);
         }
       }
 
       return totalBalance;
-    } catch (err) {
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      if ((errMsg.includes("429") || errMsg.includes("rate limit") || errMsg.includes("Too Many Requests")) && retryCount < maxRetries) {
+        const delay = baseDelay * Math.pow(2, retryCount);
+        console.warn(`Rate limited (429) fetching balance for ${fractionMint.toBase58()}, retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return fetchBalance(fractionMint, retryCount + 1);
+      }
       console.error("Error fetching token balance:", err);
       return BigInt(0);
     }
@@ -85,10 +116,12 @@ export function useTokenBalance() {
     setLoading(true);
     try {
       const connection = new Connection(endpoint, "confirmed");
-      const balanceMap = new Map<string, bigint>();
 
-      // Fetch all balances in parallel
-      const balancePromises = fractionMints.map(async (mint) => {
+      // Helper function to fetch balance for a single mint with retry logic
+      const fetchSingleBalance = async (mint: PublicKey, retryCount = 0): Promise<bigint> => {
+        const maxRetries = 3;
+        const baseDelay = 500; // Start with 500ms delay
+        
         try {
           // Check both PDA token account and regular ATA
           const pdaTokenAccount = getFractionalizerTokenAccount(mint, publicKey);
@@ -102,11 +135,24 @@ export function useTokenBalance() {
             const pdaAmount = BigInt(pdaBalance.value.amount);
             totalBalance += pdaAmount;
             if (pdaAmount > BigInt(0)) {
-              console.log(`Found ${pdaAmount} tokens in PDA account for ${mint.toBase58()}: ${pdaTokenAccount.toBase58()}`);
+              console.log(`[Balance] Found ${pdaAmount} tokens in PDA account for ${mint.toBase58().slice(0, 8)}...: ${pdaTokenAccount.toBase58().slice(0, 8)}...`);
+            } else {
+              console.debug(`[Balance] PDA account exists but has 0 balance for ${mint.toBase58().slice(0, 8)}...`);
             }
           } catch (err: any) {
-            // PDA doesn't exist, that's okay
+            // Check for rate limit errors
             const errMsg = err?.message || String(err);
+            if (errMsg.includes("429") || errMsg.includes("rate limit") || errMsg.includes("Too Many Requests")) {
+              if (retryCount < maxRetries) {
+                const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
+                console.warn(`Rate limited (429) fetching balance for ${mint.toBase58()}, retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return fetchSingleBalance(mint, retryCount + 1);
+              }
+              console.warn(`Rate limited (429) fetching balance for ${mint.toBase58()}, max retries reached`);
+              return BigInt(0);
+            }
+            // PDA doesn't exist, that's okay
             if (!errMsg.includes("Invalid param") && !errMsg.includes("not found") && !errMsg.includes("could not find account")) {
               console.warn(`Error checking PDA ${pdaTokenAccount.toBase58()} for ${mint.toBase58()}:`, err);
             }
@@ -115,31 +161,84 @@ export function useTokenBalance() {
           // Check regular ATA (in case tokens were transferred)
           try {
             const ataBalance = await connection.getTokenAccountBalance(regularATA);
-            totalBalance += BigInt(ataBalance.value.amount);
+            const ataAmount = BigInt(ataBalance.value.amount);
+            totalBalance += ataAmount;
+            if (ataAmount > BigInt(0)) {
+              console.log(`[Balance] Found ${ataAmount} tokens in ATA for ${mint.toBase58().slice(0, 8)}...`);
+            }
           } catch (err: any) {
+            // Check for rate limit errors
+            const errMsg = err?.message || String(err);
+            if (errMsg.includes("429") || errMsg.includes("rate limit") || errMsg.includes("Too Many Requests")) {
+              if (retryCount < maxRetries) {
+                const delay = baseDelay * Math.pow(2, retryCount);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return fetchSingleBalance(mint, retryCount + 1);
+              }
+              return totalBalance; // Return what we have so far
+            }
             // ATA doesn't exist, that's okay
-            if (!err?.message?.includes("Invalid param") && !err?.message?.includes("not found")) {
+            if (!errMsg.includes("Invalid param") && !errMsg.includes("not found")) {
               console.warn(`Error checking ATA for ${mint.toBase58()}:`, err);
             }
           }
 
-          balanceMap.set(mint.toBase58(), totalBalance);
+          if (totalBalance > BigInt(0)) {
+            console.log(`[Balance] Total balance for ${mint.toBase58().slice(0, 8)}...: ${totalBalance.toString()}`);
+          }
+          return totalBalance;
         } catch (err: any) {
-          console.error(`Error fetching balance for ${mint.toBase58()}:`, err);
-          balanceMap.set(mint.toBase58(), BigInt(0));
+          const errMsg = err?.message || String(err);
+          if ((errMsg.includes("429") || errMsg.includes("rate limit") || errMsg.includes("Too Many Requests")) && retryCount < maxRetries) {
+            const delay = baseDelay * Math.pow(2, retryCount);
+            console.warn(`[Balance] Rate limited (429) fetching balance for ${mint.toBase58().slice(0, 8)}..., retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return fetchSingleBalance(mint, retryCount + 1);
+          }
+          console.error(`[Balance] Error fetching balance for ${mint.toBase58().slice(0, 8)}...:`, err);
+          return BigInt(0);
         }
-      });
+      };
 
-      await Promise.all(balancePromises);
-      setBalances(balanceMap);
+      // Fetch balances incrementally - update state as each balance is fetched
+      // Optimized for speed: process all in parallel with minimal delays
+      const allPromises = fractionMints.map(async (mint, index) => {
+        // Very small stagger only for first few requests to prevent initial burst
+        if (index > 0 && index < 5) {
+          await new Promise(resolve => setTimeout(resolve, 10 * index));
+        }
+        
+        const balance = await fetchSingleBalance(mint);
+        
+        // Update state immediately as each balance is fetched
+        setBalances(prev => {
+          const newMap = new Map(prev);
+          newMap.set(mint.toBase58(), balance);
+          return newMap;
+        });
+      });
+      
+      // Wait for all to complete
+      await Promise.all(allPromises);
+
+      console.log(`[Balance] Finished fetching all balances`);
     } catch (err) {
-      console.error("Error fetching token balances:", err);
-      setBalances(new Map());
+      console.error("[Balance] Error fetching token balances:", err);
+      // Don't clear balances on error - keep existing ones
     } finally {
       setLoading(false);
     }
   }, [publicKey, endpoint]);
 
-  return { balances, loading, fetchBalance, fetchBalances };
+  const updateBalance = useCallback((mint: string, balance: bigint) => {
+    setBalances(prev => {
+      const newMap = new Map(prev);
+      newMap.set(mint, balance);
+      console.log(`[Balance] Updated balance for ${mint.slice(0, 8)}... to ${balance.toString()}`);
+      return newMap;
+    });
+  }, []);
+
+  return { balances, loading, fetchBalance, fetchBalances, updateBalance };
 }
 
