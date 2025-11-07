@@ -3,9 +3,12 @@
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import VaultExplorer from "@/components/VaultExplorer";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
+  const { publicKey } = useWallet();
 
   useEffect(() => {
     setMounted(true);
@@ -59,6 +62,11 @@ export default function Home() {
                   />
                 </svg>
               </Link>
+              <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+                {publicKey
+                  ? "Scroll down to check out your vaults"
+                  : "Connect your wallet to check your vaults"}
+              </p>
             </div>
           </div>
         </section>
@@ -119,6 +127,13 @@ export default function Home() {
                 </p>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Vault Explorer Section */}
+        <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
+          <div className="max-w-7xl mx-auto">
+            <VaultExplorer />
           </div>
         </section>
       </main>
