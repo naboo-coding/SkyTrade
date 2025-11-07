@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import VaultExplorer from "@/components/VaultExplorer";
 import { useWallet } from "@solana/wallet-adapter-react";
+import ScrollButton from "@/components/ScrollButton";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -137,6 +138,7 @@ export default function Home() {
           </div>
         </section>
       </main>
+      <ScrollButton />
     </div>
   );
 }
