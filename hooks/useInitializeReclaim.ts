@@ -72,12 +72,12 @@ function parseReclaimError(err: any, vault: VaultData): string {
   }
 
   // Check if vault is not active
-  if (!vault.status.active) {
-    const status = vault.status.reclaimInitiated
+  if (!("active" in vault.status)) {
+    const status = "reclaimInitiated" in vault.status
       ? "reclaim has already been initiated"
-      : vault.status.reclaimFinalized
+      : "reclaimFinalized" in vault.status
       ? "reclaim has already been finalized"
-      : vault.status.closed
+      : "closed" in vault.status
       ? "vault is closed"
       : "vault is not active";
     return `Cannot initialize reclaim: ${status}. Only active vaults can have reclaim initialized.`;
@@ -232,6 +232,7 @@ export function useInitializeReclaim() {
       );
 
       // Build initialize reclaim instruction
+      // Note: vault, compensationEscrowAuthority, and tokenEscrow are PDAs that Anchor will resolve automatically
       const initializeReclaimIx = await program.methods
         .initializeReclaimV1(
           vault.nftAssetId,
@@ -243,20 +244,13 @@ export function useInitializeReclaim() {
         )
         .accounts({
           user: publicKey,
-          vault: vault.publicKey,
           fractionMint: vault.fractionMint,
           userFractionedTokenAccount: userFractionedTokenAccount,
-          compensationEscrowAuthority: compensationEscrowAuthority,
-          tokenEscrow: tokenEscrow,
-          bubblegumProgram: MPL_BUBBLEGUM_ID,
           compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID_V1,
           merkleTree: merkleTreeIdWeb3,
           treeAuthority: treeAuthority,
           leafDelegate: leafDelegateWeb3 ?? null,
           logWrapper: SPL_NOOP_PROGRAM_ID_V1,
-          tokenProgram: TOKEN_PROGRAM_ID,
-          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-          systemProgram: SystemProgram.programId,
         })
         .remainingAccounts(proofAccounts)
         .instruction();

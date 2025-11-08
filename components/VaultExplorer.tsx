@@ -9,7 +9,7 @@ import { useAssetValidation } from "@/hooks/useAssetValidation";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { dasApi } from "@metaplex-foundation/digital-asset-standard-api";
-import { publicKey } from "@metaplex-foundation/umi";
+import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 import VaultCard from "./VaultCard";
 import ReclaimSuccessModal from "./ReclaimSuccessModal";
 import ErrorModal from "./ErrorModal";
@@ -230,8 +230,8 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
           } as VaultData;
         })
         .filter((vault) => {
-          const isReclaimInitiated = vault.status.reclaimInitiated !== undefined;
-          const isReclaimFinalized = vault.status.reclaimFinalized !== undefined;
+          const isReclaimInitiated = "reclaimInitiated" in vault.status;
+          const isReclaimFinalized = "reclaimFinalized" in vault.status;
           const hasTokens = vault.tokensInEscrow > BigInt(0);
           const hasCompensation = vault.remainingCompensation > BigInt(0);
           
@@ -285,7 +285,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
 
           try {
             const umi = createUmi(endpoint).use(dasApi());
-            const assetData = await umi.rpc.getAsset(publicKey(vault.nftAssetId.toBase58()));
+            const assetData = await umi.rpc.getAsset(umiPublicKey(vault.nftAssetId.toBase58()));
             const metadata = assetData.content?.metadata || {};
             const jsonUri = assetData.content?.json_uri as string | undefined;
             const metadataUri = metadata.uri as string | undefined || jsonUri;
@@ -379,7 +379,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
         let vaultName: string | undefined;
         try {
           const umi = createUmi(endpoint).use(dasApi());
-          const assetData = await umi.rpc.getAsset(publicKey(vault.nftAssetId.toBase58()));
+          const assetData = await umi.rpc.getAsset(umiPublicKey(vault.nftAssetId.toBase58()));
           const metadata = assetData.content?.metadata || {};
           const jsonUri = assetData.content?.json_uri as string | undefined;
           const metadataUri = metadata.uri as string | undefined || jsonUri;

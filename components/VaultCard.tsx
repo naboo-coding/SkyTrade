@@ -37,18 +37,18 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
   }, [vault.nftAssetId, fetchAssetById]);
 
   const getStatusDisplay = () => {
-    if (vault.status.active) return "Active";
-    if (vault.status.reclaimInitiated) return "Reclaim Initiated";
-    if (vault.status.reclaimedFinalized) return "Reclaimed Finalized";
-    if (vault.status.closed) return "Closed";
+    if ("active" in vault.status) return "Active";
+    if ("reclaimInitiated" in vault.status) return "Reclaim Initiated";
+    if ("reclaimFinalized" in vault.status) return "Reclaimed Finalized";
+    if ("closed" in vault.status) return "Closed";
     return "Unknown";
   };
 
   const getStatusColor = () => {
-    if (vault.status.active) return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-    if (vault.status.reclaimInitiated) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-    if (vault.status.reclaimedFinalized) return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-    if (vault.status.closed) return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+    if ("active" in vault.status) return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+    if ("reclaimInitiated" in vault.status) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+    if ("reclaimFinalized" in vault.status) return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+    if ("closed" in vault.status) return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
     return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
   };
 
@@ -72,7 +72,7 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
 
   const userPercentage = calculateUserPercentage();
   const minReclaimPercentage = vault.minReclaimPercentage;
-  const canInitializeReclaim = vault.status.active && userPercentage >= minReclaimPercentage;
+  const canInitializeReclaim = "active" in vault.status && userPercentage >= minReclaimPercentage;
 
   const formatDate = (timestamp: bigint): string => {
     const date = new Date(Number(timestamp) * 1000);
@@ -96,7 +96,7 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
   const nftImage = asset?.image;
 
   const getButtonTooltip = () => {
-    if (!vault.status.active) {
+    if (!("active" in vault.status)) {
       return `Vault is ${getStatusDisplay()}. Only Active vaults can be reclaimed.`;
     }
     if (userPercentage < minReclaimPercentage) {
@@ -142,11 +142,11 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
           {/* Status Badge - Minimal */}
           <div className="absolute top-2 right-2 z-10">
             <span className={`px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase rounded-md backdrop-blur-sm border transition-colors ${
-              vault.status.active 
+              "active" in vault.status
                 ? "bg-green-50/90 dark:bg-green-950/50 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
-                : vault.status.reclaimInitiated
+                : "reclaimInitiated" in vault.status
                 ? "bg-amber-50/90 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800"
-                : vault.status.reclaimedFinalized
+                : "reclaimFinalized" in vault.status
                 ? "bg-blue-50/90 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800"
                 : "bg-gray-50/90 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
             }`}>
@@ -300,7 +300,7 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
               </button>
               {!canInitializeReclaim && (
                 <p className="mt-1.5 text-[10px] text-center text-gray-400 dark:text-gray-500">
-                  {vault.status.active 
+                  {"active" in vault.status
                     ? `Requires ${minReclaimPercentage}% ownership`
                     : "Vault must be Active"
                   }

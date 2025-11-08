@@ -117,7 +117,7 @@ export function useVaults() {
         })
         .filter((vault) => {
           // Only show Active vaults
-          return vault.status.active !== undefined;
+          return "active" in vault.status;
         })
         .sort((a, b) => {
           const aTime = Number(a.creationTimestamp);
