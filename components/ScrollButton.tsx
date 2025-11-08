@@ -2,7 +2,11 @@
 
 import { useState, useEffect } from "react";
 
-export default function ScrollButton() {
+interface ScrollButtonProps {
+  hide?: boolean;
+}
+
+export default function ScrollButton({ hide = false }: ScrollButtonProps) {
   const [isAtBottom, setIsAtBottom] = useState(false);
 
   useEffect(() => {
@@ -51,6 +55,10 @@ export default function ScrollButton() {
       scrollToBottom();
     }
   };
+
+  if (hide) {
+    return null;
+  }
 
   return (
     <button

@@ -9,6 +9,7 @@ import ScrollButton from "@/components/ScrollButton";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
+  const [escrowPanelOpen, setEscrowPanelOpen] = useState(false);
   const { publicKey } = useWallet();
 
   useEffect(() => {
@@ -134,11 +135,11 @@ export default function Home() {
         {/* Vault Explorer Section */}
         <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
           <div className="max-w-7xl mx-auto">
-            <VaultExplorer />
+            <VaultExplorer onEscrowPanelChange={setEscrowPanelOpen} />
           </div>
         </section>
       </main>
-      <ScrollButton />
+      <ScrollButton hide={escrowPanelOpen} />
     </div>
   );
 }

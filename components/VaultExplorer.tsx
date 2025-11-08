@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useVaults, VaultData } from "@/hooks/useVaults";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
@@ -14,19 +14,68 @@ import VaultCard from "./VaultCard";
 import ReclaimSuccessModal from "./ReclaimSuccessModal";
 import ErrorModal from "./ErrorModal";
 import { PublicKey } from "@solana/web3.js";
+import { Program, AnchorProvider } from "@coral-xyz/anchor";
+import { Connection } from "@solana/web3.js";
+import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
+import FractionalizationIdl from "../fractionalization.json";
+import type { Fractionalization } from "../fractionalization2";
 
 const VAULTS_PER_PAGE = 10;
+const ESCROW_PERIOD_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
-export default function VaultExplorer() {
+interface EscrowData {
+  vault: VaultData;
+  tokensInEscrow: bigint;
+  remainingCompensation: bigint;
+  escrowEndsAt: bigint | null;
+  isEscrowActive: boolean;
+  nftName?: string;
+  nftImage?: string;
+}
+
+function formatTokenAmount(amount: bigint, decimals: number = 6): string {
+  const divisor = BigInt(10 ** decimals);
+  const whole = amount / divisor;
+  const fractional = amount % divisor;
+  if (fractional === BigInt(0)) {
+    return whole.toString();
+  }
+  const fractionalStr = fractional.toString().padStart(decimals, "0");
+  const trimmed = fractionalStr.replace(/0+$/, "");
+  return trimmed ? `${whole}.${trimmed}` : whole.toString();
+}
+
+function formatDate(timestamp: bigint): string {
+  const date = new Date(Number(timestamp) * 1000);
+  // Use toLocaleString to ensure local timezone is used
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+    timeZoneName: "short",
+  });
+}
+
+interface VaultExplorerProps {
+  onEscrowPanelChange?: (isOpen: boolean) => void;
+}
+
+export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProps) {
   const { vaults, loading, error, refetch } = useVaults();
   const { balances, loading: balancesLoading, fetchBalances, updateBalance } = useTokenBalance();
   const { validateAssets, validatedAssets } = useAssetValidation();
   const [displayedCount, setDisplayedCount] = useState(VAULTS_PER_PAGE);
   const [initialized, setInitialized] = useState(false);
   const [showOnlyMine, setShowOnlyMine] = useState(false);
+  const [showEscrowPanel, setShowEscrowPanel] = useState(false);
+  const [escrowData, setEscrowData] = useState<EscrowData[]>([]);
+  const [loadingEscrow, setLoadingEscrow] = useState(false);
 
-  const { publicKey } = useWallet();
-  const { endpoint } = useNetwork();
+  const { publicKey, wallet } = useWallet();
+  const { endpoint, network } = useNetwork();
 
   // Validate assets when vaults change
   useEffect(() => {
@@ -117,6 +166,197 @@ export default function VaultExplorer() {
     isOpen: boolean;
     message: string;
   }>({ isOpen: false, message: "" });
+
+  // Fetch all vaults (including reclaimed) for escrow display
+  const fetchEscrowVaults = useCallback(async () => {
+    if (!endpoint) return;
+
+    setLoadingEscrow(true);
+    try {
+      const dummyWallet = {
+        publicKey: publicKey || PublicKey.default,
+        signTransaction: async (tx: any) => tx,
+        signAllTransactions: async (txs: any[]) => txs,
+      };
+
+      const isDevnet = network === WalletAdapterNetwork.Devnet;
+      const devnetEndpoint = isDevnet
+        ? (endpoint.includes("devnet") || endpoint.includes("dev") || endpoint.includes("api.devnet")
+           ? endpoint
+           : "https://api.devnet.solana.com")
+        : endpoint;
+
+      const connection = new Connection(devnetEndpoint, "confirmed");
+      const provider = new AnchorProvider(
+        connection,
+        (wallet?.adapter || dummyWallet) as any,
+        { commitment: "confirmed" }
+      );
+
+      const program = new Program<Fractionalization>(
+        FractionalizationIdl as any,
+        provider
+      );
+
+      // Fetch all vault accounts (including reclaimed)
+      const allVaults = await program.account.vault.all();
+      console.log(`[Escrow] Fetched ${allVaults.length} total vaults`);
+
+      // Filter for vaults with escrow data
+      const vaultsWithEscrow = allVaults
+        .map((v) => {
+          const account = v.account;
+          return {
+            publicKey: v.publicKey,
+            nftMint: account.nftMint,
+            nftAssetId: account.nftAssetId,
+            fractionMint: account.fractionMint,
+            totalSupply: BigInt(account.totalSupply.toString()),
+            creator: account.creator,
+            creationTimestamp: BigInt(account.creationTimestamp.toString()),
+            status: account.status as any,
+            reclaimTimestamp: BigInt(account.reclaimTimestamp.toString()),
+            twapPriceAtReclaim: BigInt(account.twapPriceAtReclaim.toString()),
+            totalCompensation: BigInt(account.totalCompensation.toString()),
+            remainingCompensation: BigInt(account.remainingCompensation.toString()),
+            bump: account.bump,
+            minLpAgeSeconds: BigInt(account.minLpAgeSeconds.toString()),
+            minReclaimPercentage: account.minReclaimPercentage,
+            minLiquidityPercent: account.minLiquidityPercent,
+            minVolumePercent30d: account.minVolumePercent30d,
+            reclaimInitiator: account.reclaimInitiator,
+            reclaimInitiationTimestamp: BigInt(account.reclaimInitiationTimestamp.toString()),
+            tokensInEscrow: BigInt(account.tokensInEscrow.toString()),
+          } as VaultData;
+        })
+        .filter((vault) => {
+          const isReclaimInitiated = vault.status.reclaimInitiated !== undefined;
+          const isReclaimFinalized = vault.status.reclaimFinalized !== undefined;
+          const hasTokens = vault.tokensInEscrow > BigInt(0);
+          const hasCompensation = vault.remainingCompensation > BigInt(0);
+          
+          // Log vault status for debugging
+          if (isReclaimInitiated || isReclaimFinalized) {
+            console.log(`[Escrow] Found vault ${vault.publicKey.toBase58().slice(0, 8)}...`, {
+              status: vault.status,
+              isReclaimInitiated,
+              isReclaimFinalized,
+              tokensInEscrow: vault.tokensInEscrow.toString(),
+              remainingCompensation: vault.remainingCompensation.toString(),
+              hasTokens,
+              hasCompensation,
+            });
+          }
+          
+          // Show all vaults in reclaimInitiated or reclaimFinalized status
+          // Even if tokens/compensation are 0, they might be in the process
+          return isReclaimInitiated || isReclaimFinalized;
+        });
+      
+      console.log(`[Escrow] Filtered to ${vaultsWithEscrow.length} vaults with escrow status`);
+
+      // Fetch NFT metadata and build escrow data
+      const escrowDataList: EscrowData[] = [];
+      for (const vault of vaultsWithEscrow) {
+        try {
+          const now = BigInt(Math.floor(Date.now() / 1000));
+          const escrowEndsAt =
+            vault.reclaimInitiationTimestamp > BigInt(0)
+              ? vault.reclaimInitiationTimestamp + BigInt(ESCROW_PERIOD_SECONDS)
+              : null;
+          const isEscrowActive = escrowEndsAt
+            ? now < escrowEndsAt
+            : false;
+          
+          // Debug logging for timestamp issues
+          if (escrowEndsAt) {
+            console.log(`[Escrow] Vault ${vault.publicKey.toBase58().slice(0, 8)}... timestamps:`, {
+              reclaimInitiationTimestamp: vault.reclaimInitiationTimestamp.toString(),
+              escrowEndsAt: escrowEndsAt.toString(),
+              now: now.toString(),
+              reclaimInitiationDate: new Date(Number(vault.reclaimInitiationTimestamp) * 1000).toLocaleString(),
+              escrowEndsAtDate: new Date(Number(escrowEndsAt) * 1000).toLocaleString(),
+              nowDate: new Date(Number(now) * 1000).toLocaleString(),
+            });
+          }
+
+          let nftName: string | undefined;
+          let nftImage: string | undefined;
+
+          try {
+            const umi = createUmi(endpoint).use(dasApi());
+            const assetData = await umi.rpc.getAsset(publicKey(vault.nftAssetId.toBase58()));
+            const metadata = assetData.content?.metadata || {};
+            const jsonUri = assetData.content?.json_uri as string | undefined;
+            const metadataUri = metadata.uri as string | undefined || jsonUri;
+
+            nftName = metadata.name as string | undefined;
+
+            if (assetData.content?.files && assetData.content.files.length > 0) {
+              nftImage = assetData.content.files[0].uri as string | undefined;
+            }
+
+            if (!nftImage && metadataUri) {
+              try {
+                const response = await fetch(metadataUri, { mode: "cors" });
+                if (response.ok && response.status !== 429) {
+                  const json = await response.json();
+                  nftName = nftName || json.name;
+                  nftImage = nftImage || json.image;
+                }
+              } catch (err) {
+                // Silently fail
+              }
+            }
+          } catch (err) {
+            // Silently fail metadata fetch
+          }
+
+          escrowDataList.push({
+            vault,
+            tokensInEscrow: vault.tokensInEscrow,
+            remainingCompensation: vault.remainingCompensation,
+            escrowEndsAt,
+            isEscrowActive,
+            nftName,
+            nftImage,
+          });
+        } catch (err) {
+          console.error(`Error processing vault ${vault.publicKey.toBase58()}:`, err);
+        }
+      }
+
+      // Sort by most recent first (active first, then by most recent reclaim initiation time)
+      escrowDataList.sort((a, b) => {
+        if (a.isEscrowActive !== b.isEscrowActive) {
+          return a.isEscrowActive ? -1 : 1;
+        }
+        // Sort by reclaim initiation timestamp (most recent first)
+        const aTime = Number(a.vault.reclaimInitiationTimestamp);
+        const bTime = Number(b.vault.reclaimInitiationTimestamp);
+        return bTime - aTime; // Descending order (newest first)
+      });
+
+      setEscrowData(escrowDataList);
+    } catch (err: any) {
+      console.error("Error fetching escrow vaults:", err);
+      setEscrowData([]);
+    } finally {
+      setLoadingEscrow(false);
+    }
+  }, [endpoint, network, wallet, publicKey]);
+
+  // Fetch escrow data when panel is opened
+  useEffect(() => {
+    if (showEscrowPanel) {
+      fetchEscrowVaults();
+    }
+  }, [showEscrowPanel, fetchEscrowVaults]);
+
+  // Notify parent when escrow panel state changes
+  useEffect(() => {
+    onEscrowPanelChange?.(showEscrowPanel);
+  }, [showEscrowPanel, onEscrowPanelChange]);
 
   const handleInitializeReclaim = async (vault: VaultData) => {
     if (!publicKey) {
@@ -268,13 +508,34 @@ export default function VaultExplorer() {
     <div className="w-full">
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-3xl font-light text-gray-900 dark:text-white mb-2 tracking-tight">
-              Vault Explorer
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              {showOnlyMine ? "Your fractionalized cNFTs" : "Explore all fractionalized cNFTs"}
-            </p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-3xl font-light text-gray-900 dark:text-white mb-2 tracking-tight">
+                Vault Explorer
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                {showOnlyMine ? "Your fractionalized cNFTs" : "Explore all fractionalized cNFTs"}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowEscrowPanel(true)}
+              className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              title="View Escrow"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
           </div>
           <div className="flex items-center gap-3">
             {publicKey && (
@@ -381,6 +642,160 @@ export default function VaultExplorer() {
         title="Reclaim Initialization Failed"
         onClose={() => setErrorModal({ isOpen: false, message: "" })}
       />
+
+      {/* Escrow Slide-over Panel */}
+      <div
+        className={`fixed inset-0 z-50 overflow-hidden transition-opacity duration-300 ${
+          showEscrowPanel ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black bg-opacity-50"
+          onClick={() => setShowEscrowPanel(false)}
+        />
+
+        {/* Panel */}
+        <div
+          className={`absolute right-0 top-0 h-full w-full max-w-2xl bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out ${
+            showEscrowPanel ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-2xl font-light text-gray-900 dark:text-white">Escrow</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  View tokens and compensation held in escrow
+                </p>
+              </div>
+              <button
+                onClick={() => setShowEscrowPanel(false)}
+                className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingEscrow ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Loading escrow data...</p>
+                  </div>
+                </div>
+              ) : escrowData.length === 0 ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="text-center">
+                    <p className="text-gray-600 dark:text-gray-400 mb-2">No active escrows</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-500">
+                      There are currently no vaults with tokens or compensation in escrow.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-6 text-sm text-gray-600 dark:text-gray-400">
+                    Showing {escrowData.length} vault{escrowData.length !== 1 ? "s" : ""} with escrow data
+                  </div>
+                  <div className="space-y-4">
+                    {escrowData.map((data) => (
+                      <div
+                        key={data.vault.publicKey.toBase58()}
+                        className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                              {data.nftName || `Vault ${data.vault.publicKey.toBase58().slice(0, 8)}...`}
+                            </h3>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                              <p>Vault: {data.vault.publicKey.toBase58().slice(0, 8)}...{data.vault.publicKey.toBase58().slice(-8)}</p>
+                              <p>Fraction Mint: {data.vault.fractionMint.toBase58().slice(0, 8)}...{data.vault.fractionMint.toBase58().slice(-8)}</p>
+                            </div>
+                          </div>
+                          {data.nftImage && (
+                            <div className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 flex-shrink-0 ml-4">
+                              <img
+                                src={data.nftImage}
+                                alt={data.nftName || "NFT"}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = "none";
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-3 mt-4">
+                          <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-md">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Tokens in Escrow</span>
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                              {formatTokenAmount(data.tokensInEscrow, 9)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-md">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Remaining Compensation (USDC)</span>
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                              {formatTokenAmount(data.remainingCompensation, 6)}
+                            </span>
+                          </div>
+
+                          {data.escrowEndsAt && (
+                            <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                                {data.isEscrowActive ? "Escrow Ends At" : "Escrow Ended At"}
+                              </span>
+                              <span className={`text-sm font-semibold ${data.isEscrowActive ? "text-blue-900 dark:text-blue-100" : "text-gray-600 dark:text-gray-400"}`}>
+                                {formatDate(data.escrowEndsAt)}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-md">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</span>
+                            <span className={`text-sm font-semibold px-2 py-1 rounded ${
+                              data.isEscrowActive
+                                ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                                : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"
+                            }`}>
+                              {data.isEscrowActive ? "Active" : "Ended"}
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <p>Reclaim Initiator: {data.vault.reclaimInitiator.toBase58().slice(0, 8)}...{data.vault.reclaimInitiator.toBase58().slice(-8)}</p>
+                            {data.vault.reclaimInitiationTimestamp > BigInt(0) && (
+                              <p>Initiated: {formatDate(data.vault.reclaimInitiationTimestamp)}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
