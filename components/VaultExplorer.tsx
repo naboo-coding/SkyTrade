@@ -476,7 +476,20 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
     );
   }
 
-  if (vaults.length === 0 && !loading) {
+  // Show message when wallet is not connected
+  if (!publicKey && !loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="text-center">
+          <p className="text-gray-600 dark:text-gray-400">
+            Connect your wallet to view your vaults
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (vaults.length === 0 && !loading && publicKey) {
     return (
       <div className="flex justify-center items-center py-12">
         <div className="text-center">

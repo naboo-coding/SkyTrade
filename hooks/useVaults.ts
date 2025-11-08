@@ -54,17 +54,18 @@ export function useVaults() {
       return;
     }
 
+    // Only fetch vaults when wallet is connected
+    if (!publicKey) {
+      setVaults([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      // Use a dummy wallet adapter for read-only operations if wallet is not connected
-      const dummyWallet = {
-        publicKey: publicKey || PublicKey.default,
-        signTransaction: async (tx: any) => tx,
-        signAllTransactions: async (txs: any[]) => txs,
-      };
-
       const isDevnet = network === WalletAdapterNetwork.Devnet;
       const devnetEndpoint = isDevnet
         ? (endpoint.includes("devnet") || endpoint.includes("dev") || endpoint.includes("api.devnet")
@@ -75,7 +76,7 @@ export function useVaults() {
       const connection = new Connection(devnetEndpoint, "confirmed");
       const provider = new AnchorProvider(
         connection,
-        (wallet?.adapter || dummyWallet) as any,
+        wallet?.adapter as any,
         { commitment: "confirmed" }
       );
 
