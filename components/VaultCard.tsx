@@ -106,131 +106,105 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
   };
 
   return (
-    <div className="group relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-2xl rounded-3xl border border-gray-200/60 dark:border-gray-800/60 overflow-hidden hover:border-blue-400/60 dark:hover:border-blue-500/60 transition-all duration-700 hover:shadow-2xl hover:shadow-blue-500/20 dark:hover:shadow-blue-500/30 hover:-translate-y-1">
-      {/* Animated gradient overlay on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/0 via-purple-500/0 to-pink-500/0 group-hover:from-blue-500/8 group-hover:via-purple-500/8 group-hover:to-pink-500/8 transition-all duration-700 pointer-events-none" />
-      
-      {/* Shimmer effect overlay */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none">
-        <div className="absolute inset-0 animate-shimmer" />
-      </div>
-      
+    <div className="group relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 overflow-hidden hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-300 hover:shadow-md">
       <div className="relative">
-        {/* Enhanced Image Section with gradient overlay */}
-        <div className="relative w-full h-44 bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 overflow-hidden">
-          {/* Gradient overlay for better text readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-          
+        {/* Slim Image Section */}
+        <div className="relative w-full h-36 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 overflow-hidden">
           {assetLoading ? (
             <div className="w-full h-full flex items-center justify-center">
-              <div className="relative">
-                <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-200/50 dark:border-gray-800/50 border-t-blue-500 dark:border-t-blue-400"></div>
-                <div className="absolute inset-0 animate-pulse-glow rounded-full"></div>
-              </div>
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 dark:border-gray-700 border-t-gray-600 dark:border-t-gray-400"></div>
             </div>
           ) : nftImage && !imageError ? (
-            <>
-              <img
-                src={nftImage}
-                alt={nftName}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
-                onError={() => setImageError(true)}
-              />
-              {/* Subtle shine effect on hover */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out pointer-events-none" />
-            </>
+            <img
+              src={nftImage}
+              alt={nftName}
+              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
+              onError={() => setImageError(true)}
+            />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50/80 via-purple-50/80 to-pink-50/80 dark:from-blue-950/80 dark:via-purple-950/80 dark:to-pink-950/80">
-              <div className="relative">
-                <svg
-                  className="w-14 h-14 text-gray-300 dark:text-gray-800 animate-float"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
+            <div className="w-full h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50">
+              <svg
+                className="w-10 h-10 text-gray-300 dark:text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
             </div>
           )}
           
-          {/* Status Badge - Enhanced with glow */}
-          <div className="absolute top-2.5 right-2.5 z-10">
-            <span className={`px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase rounded-full shadow-xl backdrop-blur-md border transition-all duration-300 group-hover:scale-105 ${
+          {/* Status Badge - Minimal */}
+          <div className="absolute top-2 right-2 z-10">
+            <span className={`px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase rounded-md backdrop-blur-sm border transition-colors ${
               vault.status.active 
-                ? "bg-green-500/25 dark:bg-green-500/25 text-green-700 dark:text-green-300 border-green-500/40 shadow-green-500/20"
+                ? "bg-green-50/90 dark:bg-green-950/50 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
                 : vault.status.reclaimInitiated
-                ? "bg-yellow-500/25 dark:bg-yellow-500/25 text-yellow-700 dark:text-yellow-300 border-yellow-500/40 shadow-yellow-500/20"
+                ? "bg-amber-50/90 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800"
                 : vault.status.reclaimedFinalized
-                ? "bg-blue-500/25 dark:bg-blue-500/25 text-blue-700 dark:text-blue-300 border-blue-500/40 shadow-blue-500/20"
-                : "bg-gray-500/25 dark:bg-gray-500/25 text-gray-700 dark:text-gray-300 border-gray-500/40 shadow-gray-500/20"
+                ? "bg-blue-50/90 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800"
+                : "bg-gray-50/90 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
             }`}>
               {getStatusDisplay()}
             </span>
           </div>
         </div>
 
-        {/* Enhanced Content Section */}
-        <div className="p-4 space-y-3.5">
-          {/* Name - Enhanced with better typography */}
-          <div className="relative">
-            <h3 className="text-base font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300 tracking-tight">
-              {nftName}
-            </h3>
-            {/* Subtle underline on hover */}
-            <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-500 group-hover:w-full transition-all duration-500" />
-          </div>
+        {/* Content Section - Slim */}
+        <div className="p-3 space-y-2.5">
+          {/* Name */}
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate leading-tight">
+            {nftName}
+          </h3>
 
-          {/* Enhanced Stats Grid with better visual hierarchy */}
-          <div className="space-y-2.5">
-            {/* Token Supply - Enhanced */}
-            <div className="flex items-center justify-between py-1 px-1 rounded-lg group-hover:bg-gray-50/50 dark:group-hover:bg-gray-800/30 transition-colors duration-300">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-500 flex items-center gap-1.5">
+          {/* Stats Grid - Compact */}
+          <div className="space-y-1.5">
+            {/* Token Supply */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
                 Supply
               </span>
-              <span className="text-xs font-bold text-gray-900 dark:text-gray-100 tabular-nums">
+              <span className="font-medium text-gray-900 dark:text-gray-100 tabular-nums">
                 {formatTokenAmount(vault.totalSupply)}
               </span>
             </div>
 
-            {/* User Position - Enhanced with visual indicator */}
-            <div className="flex items-center justify-between py-1 px-1 rounded-lg group-hover:bg-gray-50/50 dark:group-hover:bg-gray-800/30 transition-colors duration-300">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-500 flex items-center gap-1.5">
+            {/* User Position */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
                 Position
               </span>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-bold tabular-nums flex items-center gap-1 transition-all duration-200 ${userBalance > BigInt(0) ? "text-green-600 dark:text-green-400" : checkingBalance ? "text-gray-500 dark:text-gray-500" : balanceLoading ? "text-gray-500 dark:text-gray-500" : "text-gray-400 dark:text-gray-600"}`}>
+              <div className="flex items-center gap-1.5">
+                <span className={`font-medium tabular-nums flex items-center gap-1 ${userBalance > BigInt(0) ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-gray-600"}`}>
                   {checkingBalance ? (
                     <span className="flex items-center gap-1 text-gray-500 dark:text-gray-500">
-                      <div className="animate-spin rounded-full h-2.5 w-2.5 border-2 border-current border-t-transparent"></div>
-                      Checking...
+                      <div className="animate-spin rounded-full h-2 w-2 border border-current border-t-transparent"></div>
                     </span>
                   ) : balanceLoading && userBalance === BigInt(0) ? (
                     <span className="flex items-center gap-1 text-gray-500 dark:text-gray-500">
-                      <div className="animate-spin rounded-full h-2.5 w-2.5 border-2 border-current border-t-transparent"></div>
-                      <span className="text-[10px]">Loading...</span>
+                      <div className="animate-spin rounded-full h-2 w-2 border border-current border-t-transparent"></div>
                     </span>
                   ) : userBalance > BigInt(0) ? (
                     <>
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                       </span>
-                      {formatTokenAmount(userBalance)} <span className="text-[10px] opacity-70 font-medium">({userPercentage.toFixed(1)}%)</span>
+                      {formatTokenAmount(userBalance)} <span className="text-[10px] opacity-70">({userPercentage.toFixed(1)}%)</span>
                     </>
                   ) : (
-                    <span className="text-gray-400 dark:text-gray-600" title="No tokens found in your wallet for this vault">—</span>
+                    <span className="text-gray-400 dark:text-gray-600">—</span>
                   )}
                 </span>
                 {publicKey && !checkingBalance && (
@@ -244,7 +218,6 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
                         if (onBalanceUpdate) {
                           onBalanceUpdate(vault.fractionMint.toBase58(), balance);
                         } else {
-                          // Fallback: reload if callback not provided
                           window.location.reload();
                         }
                       } catch (err) {
@@ -253,8 +226,8 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
                         setCheckingBalance(false);
                       }
                     }}
-                    className="text-[10px] text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 transition-colors opacity-70 hover:opacity-100"
-                    title="Refresh balance for this vault"
+                    className="text-[10px] text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                    title="Refresh balance"
                   >
                     ↻
                   </button>
@@ -262,47 +235,34 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
               </div>
             </div>
 
-            {/* Creator - Enhanced */}
-            <div className="flex items-center justify-between py-1 px-1 rounded-lg group-hover:bg-gray-50/50 dark:group-hover:bg-gray-800/30 transition-colors duration-300">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-500 flex items-center gap-1.5">
+            {/* Creator */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
                 Creator
               </span>
-              <span className="font-mono text-[10px] font-semibold text-gray-700 dark:text-gray-300 truncate max-w-[100px] hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-help" title={vault.creator.toBase58()}>
+              <span className="font-mono text-[10px] font-medium text-gray-600 dark:text-gray-400 truncate max-w-[90px] cursor-help" title={vault.creator.toBase58()}>
                 {vault.creator.toBase58().slice(0, 4)}...{vault.creator.toBase58().slice(-4)}
               </span>
             </div>
 
-            {/* Asset ID - Enhanced */}
-            <div className="flex items-center justify-between py-1 px-1 rounded-lg group-hover:bg-gray-50/50 dark:group-hover:bg-gray-800/30 transition-colors duration-300">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-500 flex items-center gap-1.5">
+            {/* Creation Date */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-                Asset
-              </span>
-              <span className="font-mono text-[10px] font-semibold text-gray-700 dark:text-gray-300 truncate max-w-[100px] hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-help" title={vault.nftAssetId.toBase58()}>
-                {vault.nftAssetId.toBase58().slice(0, 4)}...{vault.nftAssetId.toBase58().slice(-4)}
-              </span>
-            </div>
-
-            {/* Creation Date - Enhanced */}
-            <div className="flex items-center justify-between py-1 px-1 rounded-lg group-hover:bg-gray-50/50 dark:group-hover:bg-gray-800/30 transition-colors duration-300">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-500 flex items-center gap-1.5">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Created
               </span>
-              <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">{formattedDate}</span>
+              <span className="font-medium text-gray-600 dark:text-gray-400 text-[10px]">{formattedDate}</span>
             </div>
           </div>
 
-          {/* Enhanced Initialize Reclaim Button */}
+          {/* Initialize Reclaim Button - Clean */}
           {onInitializeReclaim && (
-            <div className="pt-2">
+            <div className="pt-1.5">
               <button
                 onClick={() => {
                   if (canInitializeReclaim && !isProcessing) {
@@ -311,40 +271,35 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
                 }}
                 disabled={!canInitializeReclaim || isProcessing}
                 title={getButtonTooltip()}
-                className={`relative w-full px-3 py-2.5 rounded-xl font-semibold text-xs transition-all duration-300 overflow-hidden group ${
+                className={`relative w-full px-3 py-2 rounded-lg font-medium text-xs transition-all duration-200 ${
                   canInitializeReclaim && !isProcessing
-                    ? "bg-gradient-to-r from-blue-600 via-blue-600 to-blue-700 hover:from-blue-700 hover:via-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl hover:shadow-blue-500/30 transform hover:scale-[1.02] active:scale-[0.98]"
-                    : "bg-gray-100/60 dark:bg-gray-800/60 text-gray-400 dark:text-gray-600 cursor-not-allowed border border-gray-200/60 dark:border-gray-700/60"
+                    ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 shadow-sm"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
                 }`}
               >
-                {/* Button shine effect */}
-                {canInitializeReclaim && !isProcessing && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
-                )}
-                
                 {isProcessing ? (
-                  <span className="relative flex items-center justify-center gap-2">
-                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-current border-t-transparent"></div>
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent"></div>
                     Processing...
                   </span>
                 ) : canInitializeReclaim ? (
-                  <span className="relative flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <span className="flex items-center justify-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     Initialize Reclaim
                   </span>
                 ) : (
-                  <span className="relative flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  <span className="flex items-center justify-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                     Initialize Reclaim
                   </span>
                 )}
               </button>
               {!canInitializeReclaim && (
-                <p className="mt-2 text-[10px] text-center text-gray-500 dark:text-gray-500 font-medium">
+                <p className="mt-1.5 text-[10px] text-center text-gray-400 dark:text-gray-500">
                   {vault.status.active 
                     ? `Requires ${minReclaimPercentage}% ownership`
                     : "Vault must be Active"

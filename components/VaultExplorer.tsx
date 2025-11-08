@@ -519,24 +519,24 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
 
   return (
     <div className="w-full">
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div>
-              <h2 className="text-3xl font-light text-gray-900 dark:text-white mb-2 tracking-tight">
+              <h2 className="text-2xl font-medium text-gray-900 dark:text-white mb-1 tracking-tight">
                 Vault Explorer
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 {showOnlyMine ? "Your fractionalized cNFTs" : "Explore all fractionalized cNFTs"}
               </p>
             </div>
             <button
               onClick={() => setShowEscrowPanel(true)}
-              className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               title="View Escrow"
             >
               <svg
-                className="w-6 h-6"
+                className="w-4 h-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -550,20 +550,20 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
               </svg>
             </button>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {publicKey && (
               <>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={showOnlyMine}
                     onChange={(e) => {
                       setShowOnlyMine(e.target.checked);
-                      setDisplayedCount(VAULTS_PER_PAGE); // Reset pagination when filtering
+                      setDisplayedCount(VAULTS_PER_PAGE);
                     }}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    className="w-3.5 h-3.5 text-gray-900 dark:text-gray-100 rounded focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-600"
                   />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Show only mine</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">Show only mine</span>
                 </label>
                 <button
                   onClick={() => {
@@ -571,16 +571,16 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
                     console.log("Manual refresh: Fetching balances for", fractionMints.length, "vaults");
                     fetchBalances(fractionMints);
                   }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 bg-gray-900 dark:bg-gray-100 hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-gray-900 rounded-lg font-medium transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   disabled={loading || balancesLoading}
                 >
                   {loading || balancesLoading ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span className="flex items-center gap-1.5">
+                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent"></div>
                       Refreshing...
                     </span>
                   ) : (
-                    "Refresh Balances"
+                    "Refresh"
                   )}
                 </button>
               </>
@@ -589,7 +589,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         {displayedVaults.map((vault) => {
           const balance = balances.get(vault.fractionMint.toBase58()) ?? BigInt(0);
           const isThisVaultProcessing = processingVault === vault.publicKey.toBase58();
@@ -615,10 +615,10 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
       </div>
 
       {displayedCount < filteredVaults.length && (
-        <div className="flex justify-center mt-8">
+        <div className="flex justify-center mt-6">
           <button
             onClick={handleLoadMore}
-            className="px-6 py-3 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors font-medium"
+            className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium shadow-sm"
           >
             Load More
           </button>
@@ -626,7 +626,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
       )}
 
       {filteredVaults.length > 0 && (
-        <div className="text-center mt-6 text-sm text-gray-500 dark:text-gray-400">
+        <div className="text-center mt-4 text-xs text-gray-500 dark:text-gray-400">
           Showing {displayedVaults.length} of {filteredVaults.length} vaults
           {showOnlyMine && publicKey && ` (created by you)`}
         </div>
@@ -676,19 +676,19 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
         >
           <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <div>
-                <h2 className="text-2xl font-light text-gray-900 dark:text-white">Escrow</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <h2 className="text-xl font-medium text-gray-900 dark:text-white">Escrow</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   View tokens and compensation held in escrow
                 </p>
               </div>
               <button
                 onClick={() => setShowEscrowPanel(false)}
-                className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               >
                 <svg
-                  className="w-6 h-6"
+                  className="w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -704,46 +704,46 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4">
               {loadingEscrow ? (
                 <div className="flex justify-center items-center py-12">
                   <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-400">Loading escrow data...</p>
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 dark:border-gray-700 border-t-gray-600 dark:border-t-gray-400 mx-auto mb-3"></div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading escrow data...</p>
                   </div>
                 </div>
               ) : escrowData.length === 0 ? (
                 <div className="flex justify-center items-center py-12">
                   <div className="text-center">
-                    <p className="text-gray-600 dark:text-gray-400 mb-2">No active escrows</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">No active escrows</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
                       There are currently no vaults with tokens or compensation in escrow.
                     </p>
                   </div>
                 </div>
               ) : (
                 <>
-                  <div className="mb-6 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="mb-4 text-xs text-gray-500 dark:text-gray-400">
                     Showing {escrowData.length} vault{escrowData.length !== 1 ? "s" : ""} with escrow data
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {escrowData.map((data) => (
                       <div
                         key={data.vault.publicKey.toBase58()}
-                        className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
+                        className="bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
                       >
-                        <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1.5">
                               {data.nftName || `Vault ${data.vault.publicKey.toBase58().slice(0, 8)}...`}
                             </h3>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
                               <p>Vault: {data.vault.publicKey.toBase58().slice(0, 8)}...{data.vault.publicKey.toBase58().slice(-8)}</p>
                               <p>Fraction Mint: {data.vault.fractionMint.toBase58().slice(0, 8)}...{data.vault.fractionMint.toBase58().slice(-8)}</p>
                             </div>
                           </div>
                           {data.nftImage && (
-                            <div className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 flex-shrink-0 ml-4">
+                            <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 flex-shrink-0 ml-3">
                               <img
                                 src={data.nftImage}
                                 alt={data.nftName || "NFT"}
@@ -756,44 +756,44 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
                           )}
                         </div>
 
-                        <div className="space-y-3 mt-4">
-                          <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-md">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Tokens in Escrow</span>
-                            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        <div className="space-y-2 mt-3">
+                          <div className="flex items-center justify-between p-2 bg-white dark:bg-gray-900 rounded-md text-xs">
+                            <span className="font-medium text-gray-600 dark:text-gray-400">Tokens in Escrow</span>
+                            <span className="font-semibold text-gray-900 dark:text-white">
                               {formatTokenAmount(data.tokensInEscrow, 9)}
                             </span>
                           </div>
 
-                          <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-md">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Remaining Compensation (USDC)</span>
-                            <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          <div className="flex items-center justify-between p-2 bg-white dark:bg-gray-900 rounded-md text-xs">
+                            <span className="font-medium text-gray-600 dark:text-gray-400">Remaining Compensation (USDC)</span>
+                            <span className="font-semibold text-gray-900 dark:text-white">
                               {formatTokenAmount(data.remainingCompensation, 6)}
                             </span>
                           </div>
 
                           {data.escrowEndsAt && (
-                            <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                            <div className="flex items-center justify-between p-2 bg-blue-50 dark:bg-blue-950/30 rounded-md text-xs">
+                              <span className="font-medium text-blue-700 dark:text-blue-400">
                                 {data.isEscrowActive ? "Escrow Ends At" : "Escrow Ended At"}
                               </span>
-                              <span className={`text-sm font-semibold ${data.isEscrowActive ? "text-blue-900 dark:text-blue-100" : "text-gray-600 dark:text-gray-400"}`}>
+                              <span className={`font-semibold ${data.isEscrowActive ? "text-blue-900 dark:text-blue-300" : "text-gray-600 dark:text-gray-400"}`}>
                                 {formatDate(data.escrowEndsAt)}
                               </span>
                             </div>
                           )}
 
-                          <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-md">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</span>
-                            <span className={`text-sm font-semibold px-2 py-1 rounded ${
+                          <div className="flex items-center justify-between p-2 bg-white dark:bg-gray-900 rounded-md text-xs">
+                            <span className="font-medium text-gray-600 dark:text-gray-400">Status</span>
+                            <span className={`font-semibold px-2 py-0.5 rounded text-[10px] ${
                               data.isEscrowActive
-                                ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
-                                : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300"
+                                ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400"
+                                : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
                             }`}>
                               {data.isEscrowActive ? "Active" : "Ended"}
                             </span>
                           </div>
 
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                          <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                             <p>Reclaim Initiator: {data.vault.reclaimInitiator.toBase58().slice(0, 8)}...{data.vault.reclaimInitiator.toBase58().slice(-8)}</p>
                             {data.vault.reclaimInitiationTimestamp > BigInt(0) && (
                               <p>Initiated: {formatDate(data.vault.reclaimInitiationTimestamp)}</p>
