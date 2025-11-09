@@ -60,6 +60,6 @@
     "nextjs",
     "metaplex"
   ],
-  "license": "ISC",
+  "license": "BSD-2-Clause",
   "type": "commonjs"
 }
