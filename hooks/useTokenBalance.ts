@@ -5,6 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { useNetwork } from "@/contexts/NetworkContext";
+import { withRateLimit } from "@/utils/rateLimiter";
 
 // Derive the PDA token account used by the fractionalization program
 // This is the account where tokens are sent when you fractionalize (not a regular ATA)
@@ -47,7 +48,7 @@ export function useTokenBalance() {
 
       // Check PDA token account (primary source for fractionalized tokens)
       try {
-        const pdaBalance = await connection.getTokenAccountBalance(pdaTokenAccount);
+        const pdaBalance = await withRateLimit(() => connection.getTokenAccountBalance(pdaTokenAccount));
         const pdaAmount = BigInt(pdaBalance.value.amount);
         totalBalance += pdaAmount;
         if (pdaAmount > BigInt(0)) {
@@ -74,7 +75,7 @@ export function useTokenBalance() {
 
       // Also check regular ATA (in case tokens were transferred there)
       try {
-        const ataBalance = await connection.getTokenAccountBalance(regularATA);
+        const ataBalance = await withRateLimit(() => connection.getTokenAccountBalance(regularATA));
         totalBalance += BigInt(ataBalance.value.amount);
       } catch (err: any) {
         const errMsg = err?.message || String(err);
@@ -131,7 +132,7 @@ export function useTokenBalance() {
 
           // Check PDA token account (where fractionalization sends tokens)
           try {
-            const pdaBalance = await connection.getTokenAccountBalance(pdaTokenAccount);
+            const pdaBalance = await withRateLimit(() => connection.getTokenAccountBalance(pdaTokenAccount));
             const pdaAmount = BigInt(pdaBalance.value.amount);
             totalBalance += pdaAmount;
             if (pdaAmount > BigInt(0)) {
@@ -160,7 +161,7 @@ export function useTokenBalance() {
 
           // Check regular ATA (in case tokens were transferred)
           try {
-            const ataBalance = await connection.getTokenAccountBalance(regularATA);
+            const ataBalance = await withRateLimit(() => connection.getTokenAccountBalance(regularATA));
             const ataAmount = BigInt(ataBalance.value.amount);
             totalBalance += ataAmount;
             if (ataAmount > BigInt(0)) {
@@ -201,11 +202,12 @@ export function useTokenBalance() {
       };
 
       // Fetch balances incrementally - update state as each balance is fetched
-      // Optimized for speed: process all in parallel with minimal delays
+      // Rate limited: stagger requests to prevent 429 errors
       const allPromises = fractionMints.map(async (mint, index) => {
-        // Very small stagger only for first few requests to prevent initial burst
-        if (index > 0 && index < 5) {
-          await new Promise(resolve => setTimeout(resolve, 10 * index));
+        // Add progressive delay to all requests to prevent rate limiting
+        // Use 300ms delay between each request to stay well below rate limits
+        if (index > 0) {
+          await new Promise(resolve => setTimeout(resolve, 300 * index));
         }
         
         const balance = await fetchSingleBalance(mint);

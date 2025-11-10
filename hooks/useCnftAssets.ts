@@ -6,6 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import umiWithCurrentWalletAdapter from "@/lib/umi/umiWithCurrentWalletAdapter";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
+import { withRateLimit } from "@/utils/rateLimiter";
 
 interface CnftAsset {
   id: string;
@@ -81,15 +82,17 @@ export function useCnftAssets() {
       // We need to paginate backwards to find the oldest transaction
       let before: string | undefined = undefined;
       let oldestSignature: ConfirmedSignatureInfo | null = null;
-      const maxPages = 3; // Reduced from 10 to limit API calls and prevent 429 errors
+      const maxPages = 1; // Reduced to 1 to minimize API calls and prevent 429 errors
       let pageCount = 0;
       
       while (pageCount < maxPages) {
         try {
-          const signatures = await connection.getSignaturesForAddress(publicKey, {
-            limit: 100, // Reduced from 1000 to limit API calls
-            before: before,
-          });
+          const signatures = await withRateLimit(() => 
+            connection.getSignaturesForAddress(publicKey, {
+              limit: 50, // Reduced to 50 to minimize API calls
+              before: before,
+            })
+          );
 
           if (!signatures || signatures.length === 0) {
             break; // No more signatures
@@ -102,7 +105,7 @@ export function useCnftAssets() {
           }
 
           // If we got fewer than the limit, we've reached the end
-          if (signatures.length < 100) {
+          if (signatures.length < 50) {
             break;
           }
 
@@ -151,7 +154,7 @@ export function useCnftAssets() {
         if (slot && umi) {
           try {
             // Try to get block time - this might fail for very old slots
-            const blockTime = await umi.rpc.getBlockTime(slot);
+            const blockTime = await withRateLimit(() => umi.rpc.getBlockTime(slot));
             if (blockTime !== null && blockTime !== undefined && blockTime > 0) {
               const timestamp = blockTime * 1000;
               // Validate timestamp is reasonable (not in the future, not too old)
@@ -425,11 +428,13 @@ export function useCnftAssets() {
         // Convert the string to UMI PublicKey before passing
         const ownerPublicKey = umiPublicKey(ownerAddress);
         
-        response = await umi.rpc.getAssetsByOwner({
-          owner: ownerPublicKey, // Use 'owner' parameter name with PublicKey type!
-          page: 1,
-          limit: 100,
-        });
+        response = await withRateLimit(() => 
+          umi.rpc.getAssetsByOwner({
+            owner: ownerPublicKey, // Use 'owner' parameter name with PublicKey type!
+            page: 1,
+            limit: 100,
+          })
+        );
       } catch (apiError: any) {
         // Check for 403/authentication errors
         const apiErrorMsg = apiError?.message || String(apiError);
@@ -605,7 +610,7 @@ export function useCnftAssets() {
           if (!hasValidCachedTimestamp) {
             // Create timestamp extraction promise (non-blocking, will update in background)
             // Add delay based on index to throttle API calls and prevent 429 errors
-            const delay = timestampPromises.length * 200; // 200ms delay between each extraction
+            const delay = timestampPromises.length * 1000; // Increased to 1000ms (1 second) delay between each extraction
             const timestampPromise = new Promise<number>((resolve) => {
               setTimeout(async () => {
                 try {
@@ -821,7 +826,7 @@ export function useCnftAssets() {
           return { success: false, error: "Invalid asset ID format. Please check the Asset ID and try again." };
         }
 
-        assetData = await umi.rpc.getAsset(umiPublicKey(trimmedAssetId));
+        assetData = await withRateLimit(() => umi.rpc.getAsset(umiPublicKey(trimmedAssetId)));
         console.log("📥 Asset data received:", {
           id: assetData?.id,
           hasCompression: !!assetData?.compression,

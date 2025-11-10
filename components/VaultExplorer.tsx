@@ -19,6 +19,7 @@ import { Connection } from "@solana/web3.js";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import FractionalizationIdl from "../fractionalization.json";
 import type { Fractionalization } from "../fractionalization2";
+import { withRateLimit } from "@/utils/rateLimiter";
 
 const VAULTS_PER_PAGE = 10;
 const ESCROW_PERIOD_SECONDS = 7 * 24 * 60 * 60; // 7 days
@@ -257,8 +258,14 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
 
       // Fetch NFT metadata and build escrow data
       const escrowDataList: EscrowData[] = [];
-      for (const vault of vaultsWithEscrow) {
+      for (let i = 0; i < vaultsWithEscrow.length; i++) {
+        const vault = vaultsWithEscrow[i];
         try {
+          // Add delay between iterations to prevent rate limiting
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between vault metadata fetches
+          }
+          
           const now = BigInt(Math.floor(Date.now() / 1000));
           const escrowEndsAt =
             vault.reclaimInitiationTimestamp > BigInt(0)
@@ -285,7 +292,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
 
           try {
             const umi = createUmi(endpoint).use(dasApi());
-            const assetData = await umi.rpc.getAsset(umiPublicKey(vault.nftAssetId.toBase58()));
+            const assetData = await withRateLimit(() => umi.rpc.getAsset(umiPublicKey(vault.nftAssetId.toBase58())));
             const metadata = assetData.content?.metadata || {};
             const jsonUri = assetData.content?.json_uri as string | undefined;
             const metadataUri = metadata.uri as string | undefined || jsonUri;
@@ -379,7 +386,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
         let vaultName: string | undefined;
         try {
           const umi = createUmi(endpoint).use(dasApi());
-          const assetData = await umi.rpc.getAsset(umiPublicKey(vault.nftAssetId.toBase58()));
+          const assetData = await withRateLimit(() => umi.rpc.getAsset(umiPublicKey(vault.nftAssetId.toBase58())));
           const metadata = assetData.content?.metadata || {};
           const jsonUri = assetData.content?.json_uri as string | undefined;
           const metadataUri = metadata.uri as string | undefined || jsonUri;
