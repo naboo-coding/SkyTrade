@@ -154,8 +154,8 @@ export function useCnftAssets() {
         if (slot && umi) {
           try {
             // Try to get block time - this might fail for very old slots
-            const blockTime = await withRateLimit(() => umi.rpc.getBlockTime(slot));
-            if (blockTime !== null && blockTime !== undefined && blockTime > 0) {
+            const blockTime = await withRateLimit(() => umi.rpc.getBlockTime(slot)) as number | null | undefined;
+            if (blockTime !== null && blockTime !== undefined && typeof blockTime === 'number' && blockTime > 0) {
               const timestamp = blockTime * 1000;
               // Validate timestamp is reasonable (not in the future, not too old)
               const now = Date.now();
