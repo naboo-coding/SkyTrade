@@ -20,18 +20,18 @@ export default function Home() {
     <div className="min-h-screen bg-white dark:bg-gray-900">
       <Navbar />
       <main className="relative overflow-hidden">
-        {/* Hero Section */}
+        {/* Hero section */}
         <section className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 sm:px-6 lg:px-8 overflow-hidden">
-          {/* Subtle background gradient */}
+          {/* Background gradient */}
           <div className="absolute inset-0 bg-gradient-to-b from-gray-50 via-white to-white dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 -z-10" />
           
-          {/* Smooth background lighting with enhanced blur to remove artifacts */}
+          {/* Background lighting effects with blur */}
           <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-blue-200 dark:bg-blue-950 rounded-full mix-blend-multiply dark:mix-blend-soft-light blur-[120px] opacity-25 ambient-light" />
           <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-purple-200 dark:bg-purple-950 rounded-full mix-blend-multiply dark:mix-blend-soft-light blur-[120px] opacity-15 ambient-light" style={{ animationDelay: "2s" }} />
           <div className="absolute top-1/2 left-1/3 w-[400px] h-[400px] bg-indigo-200 dark:bg-indigo-950 rounded-full mix-blend-multiply dark:mix-blend-soft-light blur-[120px] opacity-10 ambient-light" style={{ animationDelay: "4s" }} />
 
           <div className="max-w-3xl mx-auto text-center space-y-12 relative z-10">
-            {/* Main Title with Apple-like shimmer */}
+            {/* Main title with shimmer effect */}
             <div className={`space-y-6 ${mounted ? "animate-fadeInUp" : "opacity-0"}`}>
               <h1 className="text-6xl sm:text-7xl md:text-8xl font-light tracking-tight leading-none">
                 <span className="shimmer-text dark:shimmer-text-dark inline-block">
@@ -43,7 +43,7 @@ export default function Home() {
               </p>
             </div>
 
-            {/* CTA Button */}
+            {/* Call to action button */}
             <div className={`pt-2 ${mounted ? "animate-fadeIn" : "opacity-0"}`} style={{ animationDelay: "0.3s" }}>
               <Link
                 href="/fractionalize"
@@ -73,7 +73,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Features Section */}
+        {/* Features section */}
         <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-20">
@@ -84,7 +84,7 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-              {/* Feature 1 */}
+              {/* Feature 1: Fast */}
               <div className="group text-center">
                 <div className="w-10 h-10 mx-auto mb-4 flex items-center justify-center text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors duration-200">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,7 +99,7 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Feature 2 */}
+              {/* Feature 2: Secure */}
               <div className="group text-center">
                 <div className="w-10 h-10 mx-auto mb-4 flex items-center justify-center text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors duration-200">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,7 +114,7 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Feature 3 */}
+              {/* Feature 3: Liquid */}
               <div className="group text-center">
                 <div className="w-10 h-10 mx-auto mb-4 flex items-center justify-center text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors duration-200">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -132,7 +132,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Vault Explorer Section */}
+        {/* Vault explorer section */}
         <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
           <div className="max-w-7xl mx-auto">
             <VaultExplorer onEscrowPanelChange={setEscrowPanelOpen} />

@@ -1,7 +1,5 @@
-/**
- * Client-side utility functions for uploading to Pinata
- * These work in the browser environment
- */
+// Helper functions for uploading stuff to Pinata from the browser
+// These run client-side so they need to work in the browser environment
 
 export async function uploadImageToPinata(file: File, pinataJwt: string): Promise<string> {
   const formData = new FormData();

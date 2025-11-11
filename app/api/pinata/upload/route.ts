@@ -4,7 +4,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const type = formData.get("type") as string; // "image" or "metadata"
+    const type = formData.get("type") as string; // Either "image" or "metadata"
 
     if (!file && type !== "metadata") {
       return NextResponse.json(
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Try multiple possible env var names
+    // Try different env var names in case someone used a different one
     const pinataJwt = process.env.PINATA_JWT || process.env.NEXT_PUBLIC_PINATA_JWT;
     if (!pinataJwt) {
       console.error("Pinata JWT not found. Available env vars:", {
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === "image" && file) {
-      // Upload image to Pinata
+      // Upload the image to Pinata
       const uploadFormData = new FormData();
       uploadFormData.append("file", file);
 
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         );
       }
     } else if (type === "metadata") {
-      // Upload metadata JSON to Pinata
+      // Upload the metadata JSON to Pinata
       let metadata;
       try {
         const metadataString = formData.get("metadata") as string;
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Add timeout to the fetch request
+      // Add a timeout to the fetch request so it doesn't hang forever
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
           cause: fetchError?.cause,
         });
         
-        // Check if it's a timeout
+        // Check if the request timed out
         if (fetchError?.name === "AbortError" || fetchError?.message?.includes("aborted")) {
           return NextResponse.json(
             { error: "Upload timeout: Pinata API did not respond within 30 seconds. Please try again." },
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
           );
         }
         
-        // Check if it's a network error
+        // Check if it's a network connectivity issue
         if (fetchError instanceof TypeError || fetchError?.message?.includes("fetch")) {
           return NextResponse.json(
             { error: `Network error: Unable to connect to Pinata API. ${fetchError.message || "Please check your internet connection."}` },

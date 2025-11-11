@@ -7,6 +7,7 @@ import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { useInitializeReclaim } from "@/hooks/useInitializeReclaim";
 import { useAssetValidation } from "@/hooks/useAssetValidation";
 import { useNetwork } from "@/contexts/NetworkContext";
+import useVaultStore from "@/store/useVaultStore";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { dasApi } from "@metaplex-foundation/digital-asset-standard-api";
 import { publicKey as umiPublicKey } from "@metaplex-foundation/umi";
@@ -65,10 +66,9 @@ interface VaultExplorerProps {
 }
 
 export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProps) {
-  const { vaults, loading, error, refetch } = useVaults();
+  const { vaults, loading, loadingMore, error, refetch, loadMore, hasMore } = useVaults();
   const { balances, loading: balancesLoading, fetchBalances, updateBalance } = useTokenBalance();
   const { validateAssets, validatedAssets } = useAssetValidation();
-  const [displayedCount, setDisplayedCount] = useState(VAULTS_PER_PAGE);
   const [initialized, setInitialized] = useState(false);
   const [showOnlyMine, setShowOnlyMine] = useState(false);
   const [showEscrowPanel, setShowEscrowPanel] = useState(false);
@@ -78,11 +78,11 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
   const { publicKey, wallet } = useWallet();
   const { endpoint, network } = useNetwork();
 
-  // Validate assets when vaults change
+  // Validate assets whenever the vaults list changes
   useEffect(() => {
     if (vaults.length > 0) {
       const assetIds = vaults.map((v) => v.nftAssetId.toBase58());
-      // Only validate assets that aren't already in cache
+      // Only validate assets we haven't checked yet
       const toValidate = assetIds.filter((id) => !validatedAssets.has(id));
       if (toValidate.length > 0) {
         validateAssets(toValidate);
@@ -93,20 +93,20 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
   const filteredVaults = useMemo(() => {
     let filtered = vaults;
 
-    // Filter by creator if "Show only mine" is checked
+    // Filter to only show vaults created by the current user if the checkbox is checked
     if (showOnlyMine && publicKey) {
       filtered = filtered.filter((vault) => vault.creator.toBase58() === publicKey.toBase58());
     }
 
     // Filter out placeholder/test NFTs that don't have block hash/tree data
-    // Temporarily disabled - show all vaults until we debug validation
-    // TODO: Re-enable after fixing validation
+    // Temporarily disabled - showing all vaults until we fix the validation
+    // TODO: Re-enable this once validation is working properly
     /*
     filtered = filtered.filter((vault) => {
       const assetId = vault.nftAssetId.toBase58();
       const isValid = validatedAssets.get(assetId);
-      // If validation result is false, filter it out
-      // If validation hasn't completed yet (undefined), keep it for now (will be filtered on next render)
+      // If validation failed, filter it out
+      // If validation is still running (undefined), keep it for now (will be filtered later)
       if (isValid === false) {
         console.log(`[VaultExplorer] Filtering out vault ${assetId.slice(0, 8)}... (validation failed)`);
       }
@@ -118,21 +118,21 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
     return filtered;
   }, [vaults, showOnlyMine, publicKey, validatedAssets]);
 
-  // Fetch balances when vaults change (only if wallet is connected)
-  // Initialize with empty balances immediately so UI can render
+  // Fetch balances whenever vaults change (only if wallet is connected)
+  // Start with empty balances so the UI can render right away
   useEffect(() => {
     if (filteredVaults.length > 0 && publicKey) {
       const fractionMints = filteredVaults.map((v) => v.fractionMint);
       console.log(`[VaultExplorer] Fetching balances for ${fractionMints.length} vaults, wallet: ${publicKey.toBase58().slice(0, 8)}...`);
       
-      // Initialize all balances to 0 immediately so UI renders
+      // Start with all balances at 0 so the UI can render
       const initialBalances = new Map<string, bigint>();
       fractionMints.forEach(mint => {
         initialBalances.set(mint.toBase58(), BigInt(0));
       });
-      // Don't set initial balances here - let them load incrementally
+      // Don't actually set them here - let them load incrementally
       
-      // Start fetching balances (will update incrementally)
+      // Start fetching balances (they'll update as they come in)
       fetchBalances(fractionMints);
       setInitialized(true);
     } else if (!publicKey) {
@@ -140,21 +140,39 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
     }
   }, [filteredVaults, fetchBalances, publicKey]);
 
+  // The displayed vaults are already limited by how many we've loaded
   const displayedVaults = useMemo(() => {
-    return filteredVaults.slice(0, displayedCount);
-  }, [filteredVaults, displayedCount]);
+    return filteredVaults;
+  }, [filteredVaults]);
 
-  const handleLoadMore = () => {
-    setDisplayedCount((prev) => prev + VAULTS_PER_PAGE);
-    // Fetch balances for newly displayed vaults if needed
-    if (displayedCount < filteredVaults.length) {
-      const newVaults = filteredVaults.slice(displayedCount, displayedCount + VAULTS_PER_PAGE);
-      const newMints = newVaults.map((v) => v.fractionMint);
-      if (newMints.length > 0 && publicKey) {
-        fetchBalances(newMints);
+  const handleLoadMore = useCallback(async () => {
+    // Remember how many we had before loading more
+    const previousCount = filteredVaults.length;
+    
+    // Load more vaults from the store (this sets loadingMore to true)
+    await loadMore();
+    
+    // Wait a bit for React to update everything
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Get the updated vaults directly from the store
+    const storeState = useVaultStore.getState();
+    const allLoadedVaults = storeState.getLoadedActiveVaults();
+    const newVaults = allLoadedVaults.slice(previousCount);
+    const newMints = newVaults.map((v) => v.fractionMint);
+    
+    if (newMints.length > 0 && publicKey) {
+      try {
+        // Fetch balances for the new vaults we just loaded
+        await fetchBalances(newMints);
+      } catch (err) {
+        console.error("[VaultExplorer] Error fetching balances:", err);
       }
     }
-  };
+    
+    // Clear the loading state once balances are fetched
+    storeState.setLoadingMore(false);
+  }, [loadMore, filteredVaults, publicKey, fetchBalances]);
 
   const { initializeReclaim, loading: reclaimLoading, error: reclaimError } = useInitializeReclaim();
   const [processingVault, setProcessingVault] = useState<string | null>(null);
@@ -168,7 +186,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
     message: string;
   }>({ isOpen: false, message: "" });
 
-  // Fetch all vaults (including reclaimed) for escrow display
+  // Fetch all vaults (including reclaimed ones) to show in the escrow panel
   const fetchEscrowVaults = useCallback(async () => {
     if (!endpoint) return;
 
@@ -199,11 +217,11 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
         provider
       );
 
-      // Fetch all vault accounts (including reclaimed)
+      // Get all vault accounts from the program (including reclaimed ones)
       const allVaults = await program.account.vault.all();
       console.log(`[Escrow] Fetched ${allVaults.length} total vaults`);
 
-      // Filter for vaults with escrow data
+      // Filter to only show vaults that have escrow data
       const vaultsWithEscrow = allVaults
         .map((v) => {
           const account = v.account;
@@ -236,7 +254,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
           const hasTokens = vault.tokensInEscrow > BigInt(0);
           const hasCompensation = vault.remainingCompensation > BigInt(0);
           
-          // Log vault status for debugging
+          // Log the vault status for debugging
           if (isReclaimInitiated || isReclaimFinalized) {
             console.log(`[Escrow] Found vault ${vault.publicKey.toBase58().slice(0, 8)}...`, {
               status: vault.status,
@@ -249,19 +267,19 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
             });
           }
           
-          // Show all vaults in reclaimInitiated or reclaimFinalized status
-          // Even if tokens/compensation are 0, they might be in the process
+          // Show all vaults that are in reclaimInitiated or reclaimFinalized status
+          // Even if tokens/compensation are 0, they might still be processing
           return isReclaimInitiated || isReclaimFinalized;
         });
       
       console.log(`[Escrow] Filtered to ${vaultsWithEscrow.length} vaults with escrow status`);
 
-      // Fetch NFT metadata and build escrow data
+      // Fetch NFT metadata and build the escrow data list
       const escrowDataList: EscrowData[] = [];
       for (let i = 0; i < vaultsWithEscrow.length; i++) {
         const vault = vaultsWithEscrow[i];
         try {
-          // Add delay between iterations to prevent rate limiting
+          // Add a delay between requests to avoid rate limiting
           if (i > 0) {
             await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between vault metadata fetches
           }
@@ -275,7 +293,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
             ? now < escrowEndsAt
             : false;
           
-          // Debug logging for timestamp issues
+          // Log timestamps for debugging
           if (escrowEndsAt) {
             console.log(`[Escrow] Vault ${vault.publicKey.toBase58().slice(0, 8)}... timestamps:`, {
               reclaimInitiationTimestamp: vault.reclaimInitiationTimestamp.toString(),
@@ -353,14 +371,14 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
     }
   }, [endpoint, network, wallet, publicKey]);
 
-  // Fetch escrow data when panel is opened
+  // Fetch escrow data whenever the panel opens
   useEffect(() => {
     if (showEscrowPanel) {
       fetchEscrowVaults();
     }
   }, [showEscrowPanel, fetchEscrowVaults]);
 
-  // Notify parent when escrow panel state changes
+  // Let the parent component know when the escrow panel opens or closes
   useEffect(() => {
     onEscrowPanelChange?.(showEscrowPanel);
   }, [showEscrowPanel, onEscrowPanelChange]);
@@ -382,7 +400,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
     try {
       const signature = await initializeReclaim(vault);
       if (signature) {
-        // Fetch the NFT name from the asset (with rate limit handling)
+        // Get the NFT name from the asset (with rate limit protection)
         let vaultName: string | undefined;
         try {
           const umi = createUmi(endpoint).use(dasApi());
@@ -391,40 +409,40 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
           const jsonUri = assetData.content?.json_uri as string | undefined;
           const metadataUri = metadata.uri as string | undefined || jsonUri;
           
-          // Try to get name from direct metadata first
+          // Try to get the name from the metadata first
           vaultName = metadata.name as string | undefined;
           
-          // If not found, try fetching from metadata URI (with rate limit protection)
+          // If we didn't find it, try fetching from the metadata URI (with rate limit protection)
           if (!vaultName && metadataUri) {
             try {
               const response = await fetch(metadataUri, { 
                 mode: 'cors',
               });
               
-              // Check for rate limit errors
+              // Check if we got rate limited
               if (response.status === 429) {
                 console.warn(`Rate limited (429) when fetching metadata for vault ${vault.publicKey.toBase58().slice(0, 8)}...`);
-                // Skip metadata fetch, use fallback name
+                // Skip the metadata fetch and use a fallback name
               } else if (response.ok) {
                 const json = await response.json();
                 vaultName = json.name;
               }
             } catch (err: any) {
               const errorMsg = err?.message || String(err);
-              // Only log non-rate-limit errors
+              // Only log errors that aren't rate limits
               if (!errorMsg.includes('429') && !errorMsg.includes('Rate limited')) {
                 console.debug(`Failed to fetch metadata for vault:`, errorMsg);
               }
-              // Silently fail for rate limits
+              // Just fail silently if we got rate limited
             }
           }
         } catch (err: any) {
           const errorMsg = err?.message || String(err);
-          // Check for rate limit errors
+          // Check if we got rate limited
           if (errorMsg.includes("429") || errorMsg.includes("rate limit") || errorMsg.includes("Too Many Requests")) {
             console.warn(`Rate limited (429) when fetching asset for vault ${vault.publicKey.toBase58().slice(0, 8)}...`);
           }
-          // If we can't fetch the name, use a fallback
+          // If we can't get the name, use a fallback
           vaultName = vault.nftAssetId ? `Vault ${vault.nftAssetId.toBase58().slice(0, 8)}...` : undefined;
         }
         
@@ -434,10 +452,10 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
           vaultName: vaultName || `Vault ${vault.nftAssetId.toBase58().slice(0, 8)}...`,
         });
 
-        // Refetch vaults to update status
+        // Refetch vaults to get the updated status
         setTimeout(() => {
           refetch();
-          // Refetch balances
+          // Also refetch balances
           if (publicKey) {
             const fractionMints = filteredVaults.map((v) => v.fractionMint);
             fetchBalances(fractionMints);
@@ -566,7 +584,6 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
                     checked={showOnlyMine}
                     onChange={(e) => {
                       setShowOnlyMine(e.target.checked);
-                      setDisplayedCount(VAULTS_PER_PAGE);
                     }}
                     className="w-3.5 h-3.5 text-gray-900 dark:text-gray-100 rounded focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-600"
                   />
@@ -621,20 +638,28 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
         })}
       </div>
 
-      {displayedCount < filteredVaults.length && (
+      {hasMore && (
         <div className="flex justify-center mt-6">
-          <button
-            onClick={handleLoadMore}
-            className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium shadow-sm"
-          >
-            Load More
-          </button>
+          {loadingMore ? (
+            <div className="flex items-center justify-center gap-2 px-4 py-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-400 dark:border-gray-500 border-t-transparent"></div>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Loading more vaults...</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleLoadMore}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium shadow-sm"
+            >
+              Load More
+            </button>
+          )}
         </div>
       )}
 
       {filteredVaults.length > 0 && (
         <div className="text-center mt-4 text-xs text-gray-500 dark:text-gray-400">
           Showing {displayedVaults.length} of {filteredVaults.length} vaults
+          {hasMore && " (load more to see all)"}
           {showOnlyMine && publicKey && ` (created by you)`}
         </div>
       )}
@@ -647,7 +672,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
         </div>
       )}
 
-      {/* Success Modal */}
+      {/* Success modal */}
       <ReclaimSuccessModal
         isOpen={successModal.isOpen}
         transactionSignature={successModal.signature}
@@ -655,7 +680,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
         onClose={() => setSuccessModal({ isOpen: false, signature: "" })}
       />
 
-      {/* Error Modal */}
+      {/* Error modal */}
       <ErrorModal
         isOpen={errorModal.isOpen}
         message={errorModal.message}
@@ -663,26 +688,26 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
         onClose={() => setErrorModal({ isOpen: false, message: "" })}
       />
 
-      {/* Escrow Slide-over Panel */}
+      {/* Escrow slide-over panel */}
       <div
         className={`fixed inset-0 z-50 overflow-hidden transition-opacity duration-300 ${
           showEscrowPanel ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
-        {/* Backdrop */}
+        {/* Backdrop for the panel */}
         <div
           className="absolute inset-0 bg-black bg-opacity-50"
           onClick={() => setShowEscrowPanel(false)}
         />
 
-        {/* Panel */}
+        {/* The actual panel */}
         <div
           className={`absolute right-0 top-0 h-full w-full max-w-2xl bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out ${
             showEscrowPanel ? "translate-x-0" : "translate-x-full"
           }`}
         >
           <div className="flex flex-col h-full">
-            {/* Header */}
+            {/* Panel header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <div>
                 <h2 className="text-xl font-medium text-gray-900 dark:text-white">Escrow</h2>
@@ -710,7 +735,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
               </button>
             </div>
 
-            {/* Content */}
+            {/* Panel content */}
             <div className="flex-1 overflow-y-auto p-4">
               {loadingEscrow ? (
                 <div className="flex justify-center items-center py-12">

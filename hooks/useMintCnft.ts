@@ -167,8 +167,8 @@ export function useMintCnft() {
     setAssetId(null);
 
     try {
-      // Ensure endpoint is explicitly devnet if we're on devnet
-      // WalletAdapterNetwork.Devnet is the constant value "devnet"
+      // Make sure we're using the right endpoint for devnet
+      // WalletAdapterNetwork.Devnet is just the string "devnet"
       const isDevnet = network === WalletAdapterNetwork.Devnet;
       const correctEndpoint = isDevnet 
         ? (endpoint.includes("devnet") || endpoint.includes("dev") || endpoint.includes("api.devnet")
@@ -176,18 +176,18 @@ export function useMintCnft() {
            : "https://api.devnet.solana.com")
         : endpoint;
       
-      // Update UMI store with the correct endpoint before using it
-      // This ensures the UMI instance uses the correct network
-      // Check if we need to update (Zustand updates are synchronous)
+      // Update the UMI store with the correct endpoint before we use it
+      // This makes sure UMI is using the right network
+      // Check if we actually need to update (Zustand updates are synchronous)
       const currentRpcUrl = useUmiStore.getState().rpcUrl;
       if (currentRpcUrl !== correctEndpoint) {
         updateRpcUrl(correctEndpoint);
       }
       
-      // Check wallet balance before attempting transaction
-      // Minting requires creating a collection NFT and merkle tree, which need rent exemption
-      // Estimated cost: ~0.3-0.4 SOL for tree creation (depth 14, canopy 8) + collection + transaction fees
-      const MIN_REQUIRED_SOL = 0.4; // Conservative estimate
+      // Check if the wallet has enough SOL before we try anything
+      // Minting needs a collection NFT and merkle tree, which require rent exemption
+      // Costs about 0.3-0.4 SOL for tree creation (depth 14, canopy 8) + collection + fees
+      const MIN_REQUIRED_SOL = 0.4; // Being conservative here
       const balance = await connection.getBalance(publicKey);
       const balanceSol = balance / 1e9;
       
@@ -198,36 +198,37 @@ export function useMintCnft() {
       
       const umi = umiWithCurrentWalletAdapter();
 
-      // 1. Upload image if provided
+      // Upload the image if one was provided
       let imageUrl = params.imageUrl;
       if (params.imageFile) {
         imageUrl = await uploadImageToPinata(params.imageFile);
       }
 
-      // 2. Upload metadata to Pinata (always use Pinata for proper metadata storage)
+      // Upload metadata to Pinata (always use Pinata for proper storage)
       const name = params.name || "Daft-Punk cNFT";
       const symbol = params.symbol || "DP";
       
-      // Validate symbol length (Metaplex Token Metadata requires max 10 characters)
+      // Check symbol length - Metaplex requires max 10 characters
       const MAX_SYMBOL_LENGTH = 10;
       if (symbol.length > MAX_SYMBOL_LENGTH) {
         throw new Error(`Symbol is too long. NFT symbols must be ${MAX_SYMBOL_LENGTH} characters or fewer. Your symbol "${symbol}" is ${symbol.length} characters. Please use a shorter symbol.`);
       }
       
-      // Always upload metadata to Pinata to ensure proper structure and image URL (image is optional)
+      // Always upload metadata to Pinata to make sure it's structured correctly
+      // Image is optional but we include it if we have one
       const metadataUrl = await uploadMetadataToPinata(name, symbol, imageUrl);
       
-      // Validate the Pinata URL is not too long
+      // Make sure the Pinata URL isn't too long
       const MAX_URI_LENGTH = 200;
       if (metadataUrl.length > MAX_URI_LENGTH) {
         throw new Error(`Metadata URI is too long (${metadataUrl.length} characters). The maximum allowed length is ${MAX_URI_LENGTH} characters.`);
       }
 
-      // 3. Create collection, merkle tree, and mint cNFT in a single transaction
+      // Create the collection, merkle tree, and mint the cNFT all in one transaction
       const collectionMint = generateSigner(umi);
       const merkleTree = generateSigner(umi);
       
-      // Build all three operations
+      // Build all three operations we need
       const collectionBuilder = createNft(umi, {
         mint: collectionMint,
         name: "My Collection V1",
@@ -244,7 +245,7 @@ export function useMintCnft() {
         canopyDepth: 8,
       });
 
-      // Ensure we're using the connected wallet's public key as the owner
+      // Make sure we use the connected wallet's public key as the owner
       const ownerPublicKey = umi.payer.publicKey;
       
       const mintBuilder = mintToCollectionV1(umi, {
@@ -271,24 +272,24 @@ export function useMintCnft() {
         },
       });
 
-      // Combine all three builders into a single transaction
+      // Combine all three into one transaction
       const combinedBuilder = new TransactionBuilder()
         .add(collectionBuilder)
         .add(treeBuilder)
         .add(mintBuilder);
 
-      // Send and confirm the combined transaction (single wallet approval)
+      // Send and confirm the transaction (only one wallet approval needed)
       await combinedBuilder.sendAndConfirm(umi, {
         confirm: {
           commitment: "finalized",
         },
       });
 
-      // 6. Compute Asset ID - wait a moment for the mint transaction to fully settle
+      // Wait a bit for the mint transaction to fully settle before computing the asset ID
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Note: leafIndex = 0 because we create a NEW tree each time (for testing)
-      // In production, you'd reuse trees and track the leaf index
+      // Note: leafIndex = 0 because we create a new tree each time (for testing)
+      // In production you'd reuse trees and track the leaf index
       const leafIndex = 0;
       const [assetIdPda] = findLeafAssetIdPda(umi, {
         merkleTree: merkleTree.publicKey,

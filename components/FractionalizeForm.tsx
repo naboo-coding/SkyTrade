@@ -21,8 +21,8 @@ export default function FractionalizeForm({
   const [errorModalOpen, setErrorModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  // Reset form state when assetId changes (when user selects a different NFT)
-  // The component will remount with a new key, which resets all hook state including signature
+  // Reset the form when user picks a different NFT
+  // The component remounts with a new key, which clears everything including the signature
   useEffect(() => {
     setFormData({
       totalSupply: "7000000",
@@ -34,7 +34,7 @@ export default function FractionalizeForm({
   }, [assetId]);
 
   const [formData, setFormData] = useState({
-    totalSupply: "7000000", // Default: 7M tokens
+    totalSupply: "7000000", // Default to 7 million tokens
     minLpAgeSeconds: "",
     minReclaimPercent: "",
     minLiquidityPercent: "",
@@ -67,13 +67,12 @@ export default function FractionalizeForm({
         showToast(`Fractionalization successful! Signature: ${signature.slice(0, 8)}...`, "success");
       }
     } catch (err) {
-      // Error is already handled in the hook and set in error state
-      // Just show the modal with the error message from the hook
-      // Don't log or re-throw to avoid stack traces
+      // Error is already handled in the hook, just show the modal
+      // Don't log or re-throw - we don't want stack traces everywhere
     }
   };
 
-  // Show error modal when error state changes
+  // Pop up the error modal whenever we get an error
   useEffect(() => {
     if (error) {
       setErrorMessage(error);
@@ -141,8 +140,8 @@ export default function FractionalizeForm({
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
           placeholder="7000000"
         />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Total number of fractional tokens (will be multiplied by 10^9 for decimals)
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Total number of fractional tokens (we multiply by 10^9 for decimals)
         </p>
       </div>
 

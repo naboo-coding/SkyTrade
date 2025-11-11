@@ -25,8 +25,8 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
 
   useEffect(() => {
     if (vault.nftAssetId) {
-      // Add a small delay to stagger requests and prevent rate limiting
-      // Each card will wait a bit longer based on a hash of the asset ID
+      // Add a small delay to stagger requests and avoid rate limiting
+      // Each card waits a bit longer based on a hash of the asset ID
       const delay = (parseInt(vault.nftAssetId.toBase58().slice(0, 8), 16) % 1000) * 2; // 0-2000ms delay
       const timeoutId = setTimeout(() => {
         fetchAssetById(vault.nftAssetId.toBase58());

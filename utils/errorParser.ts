@@ -1,19 +1,15 @@
-/**
- * Converts technical errors into user-friendly messages
- */
+// Takes those nasty technical errors and turns them into something humans can actually understand
 
 export function parseUserFriendlyError(error: any): string {
   const errorMessage = error?.message || String(error);
   const errorString = JSON.stringify(error).toLowerCase();
   
-  // Log error message only (not the full object to avoid stack traces)
-  // Only in development mode
+  // Only log in dev mode, and just the message - don't want stack traces cluttering things up
   if (process.env.NODE_ENV === 'development') {
-    // Log just the message, not the full error object
     console.warn("Error message:", errorMessage);
   }
   
-  // Metadata Symbol too long
+  // Check if the symbol is too long
   if (
     errorMessage.includes("MetadataSymbolTooLong") ||
     errorMessage.includes("Symbol in metadata is too long") ||
@@ -25,7 +21,7 @@ export function parseUserFriendlyError(error: any): string {
     return "The symbol is too long. NFT symbols must be 10 characters or fewer. Please use a shorter symbol.";
   }
 
-  // Metadata URI too long
+  // Check if the URI is too long
   if (
     errorMessage.includes("MetadataUriTooLong") ||
     errorMessage.includes("URI is too long") ||
@@ -37,7 +33,7 @@ export function parseUserFriendlyError(error: any): string {
     return "The image URL is too long. Please provide a Pinata JWT to upload to IPFS, or use a shorter image URL (under 100 characters).";
   }
   
-  // Wallet not connected
+  // User forgot to connect their wallet
   if (
     errorMessage.includes("Wallet not connected") ||
     errorMessage.includes("No wallet connected") ||
@@ -46,7 +42,7 @@ export function parseUserFriendlyError(error: any): string {
     return "Please connect your wallet to continue.";
   }
   
-  // Image URL required
+  // Missing image URL
   if (
     errorMessage.includes("Image URL") && 
     errorMessage.includes("required")
@@ -54,7 +50,7 @@ export function parseUserFriendlyError(error: any): string {
     return "Please provide an image URL or upload a file with a Pinata JWT.";
   }
   
-  // Insufficient funds
+  // Not enough SOL in the wallet
   if (
     errorMessage.includes("insufficient lamports") ||
     errorMessage.includes("insufficient funds") ||
@@ -62,7 +58,7 @@ export function parseUserFriendlyError(error: any): string {
     errorString.includes("insufficient funds") ||
     errorString.includes("transfer: insufficient")
   ) {
-    // Try to extract the amounts from the error
+    // See if we can pull out the actual numbers from the error message
     const lamportsMatch = errorMessage.match(/insufficient lamports (\d+), need (\d+)/i) || 
                          errorString.match(/insufficient lamports (\d+), need (\d+)/i);
     
@@ -79,7 +75,7 @@ export function parseUserFriendlyError(error: any): string {
     return "Insufficient SOL balance. Minting a cNFT requires approximately 0.3-0.4 SOL for rent exemption (creating the merkle tree and collection). Please add more SOL to your wallet.";
   }
 
-  // Transaction too large
+  // Transaction is too big to send (happens with deep merkle trees)
   if (
     errorMessage.includes("too large") ||
     errorMessage.includes("VersionedTransaction too large") ||
@@ -90,24 +86,24 @@ export function parseUserFriendlyError(error: any): string {
     return "The transaction is too large to process. This can happen with very deep merkle trees. Please try again later or contact support if the issue persists.";
   }
 
-  // Transaction simulation failed (general)
+  // Transaction simulation failed for some reason
   if (
     errorMessage.includes("Transaction simulation failed") ||
     errorMessage.includes("Simulation failed") ||
     errorString.includes("simulation failed") ||
     errorString.includes("failed to simulate transaction")
   ) {
-    // Check for transaction size first
+    // First check if it's a size issue
     if (errorString.includes("too large") || errorString.includes("max: encoded/raw")) {
       return "The transaction is too large to process. This can happen with very deep merkle trees. Please try again later or contact support if the issue persists.";
     }
     
-    // Check for specific causes
+    // Look for other specific error types
     if (errorString.includes("metadatauritoolong") || errorString.includes("0x177e")) {
       return "The image URL is too long. Please provide a Pinata JWT to upload to IPFS, or use a shorter image URL.";
     }
     
-    // Check if it's an insufficient funds error in the logs
+    // Maybe it's actually a funds issue
     if (errorString.includes("insufficient lamports") || errorString.includes("insufficient funds")) {
       return "Insufficient SOL balance. Minting a cNFT requires approximately 0.3-0.4 SOL for rent exemption. Please add more SOL to your wallet.";
     }
@@ -115,7 +111,7 @@ export function parseUserFriendlyError(error: any): string {
     return "Transaction failed. Please check your wallet has sufficient funds and try again. If the problem persists, ensure your image URL is not too long.";
   }
   
-  // Network/RPC errors
+  // Network issues or RPC problems
   if (
     errorMessage.includes("fetch") ||
     errorMessage.includes("network") ||
@@ -125,7 +121,7 @@ export function parseUserFriendlyError(error: any): string {
     return "Network error. Please check your internet connection and try again.";
   }
   
-  // Generic transaction errors
+  // Generic transaction failures
   if (
     errorMessage.includes("Transaction failed") ||
     errorMessage.includes("Transaction rejected") ||
@@ -134,8 +130,8 @@ export function parseUserFriendlyError(error: any): string {
     return "Transaction was rejected. Please try again.";
   }
   
-  // Default: return a sanitized version without technical details
-  // Remove common technical prefixes/suffixes
+  // If we don't recognize the error, clean it up and return something readable
+  // Strip out all the technical jargon
   let sanitized = errorMessage
     .replace(/Error:\s*/gi, "")
     .replace(/Transaction\s+simulation\s+failed:\s*/gi, "")
@@ -151,7 +147,7 @@ export function parseUserFriendlyError(error: any): string {
     .replace(/\[^\n]*InstructionError[^\n]*/gi, "")
     .trim();
   
-  // If it's still too long or technical, provide a generic message
+  // If it's still a mess after cleaning, just give a generic error
   if (
     sanitized.length > 200 || 
     sanitized.includes("Program") || 
