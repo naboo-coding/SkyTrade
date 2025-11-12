@@ -4,7 +4,6 @@ import { PublicKey } from "@solana/web3.js";
 import { VaultData } from "@/hooks/useVaults";
 import { useState, useEffect } from "react";
 import { useAssetByIdNoWallet } from "@/hooks/useAssetByIdNoWallet";
-import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 interface VaultCardProps {
@@ -19,9 +18,7 @@ interface VaultCardProps {
 export default function VaultCard({ vault, userBalance, onInitializeReclaim, isProcessing = false, balanceLoading = false, onBalanceUpdate }: VaultCardProps) {
   const { fetchAssetById, asset, loading: assetLoading } = useAssetByIdNoWallet();
   const [imageError, setImageError] = useState(false);
-  const { fetchBalance } = useTokenBalance();
   const { publicKey } = useWallet();
-  const [checkingBalance, setCheckingBalance] = useState(false);
 
   useEffect(() => {
     if (vault.nftAssetId) {
@@ -66,8 +63,10 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
 
   const calculateUserPercentage = (): number => {
     if (vault.totalSupply === BigInt(0)) return 0;
+    // Both userBalance and totalSupply are in the same units (raw token amounts with decimals)
+    // Cap percentage at 100% to handle edge cases where balance might exceed supply
     const percentage = (Number(userBalance) / Number(vault.totalSupply)) * 100;
-    return percentage;
+    return Math.min(percentage, 100); // Cap at 100%
   };
 
   const userPercentage = calculateUserPercentage();
@@ -108,39 +107,42 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
   return (
     <div className="group relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 overflow-hidden hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-300 hover:shadow-md">
       <div className="relative">
-        {/* Slim Image Section */}
-        <div className="relative w-full h-36 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 overflow-hidden">
-          {assetLoading ? (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 dark:border-gray-700 border-t-gray-600 dark:border-t-gray-400"></div>
-            </div>
-          ) : nftImage && !imageError ? (
-            <img
-              src={nftImage}
-              alt={nftName}
-              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50">
-              <svg
-                className="w-10 h-10 text-gray-300 dark:text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-          )}
+        {/* Image Section - Contained Frame */}
+        <div className="relative w-full p-3 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+          {/* Contained image frame */}
+          <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700/50">
+            {assetLoading ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 dark:border-gray-700 border-t-gray-600 dark:border-t-gray-400"></div>
+              </div>
+            ) : nftImage && !imageError ? (
+              <img
+                src={nftImage}
+                alt={nftName}
+                className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50">
+                <svg
+                  className="w-10 h-10 text-gray-300 dark:text-gray-700"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+            )}
+          </div>
           
           {/* Status Badge - Minimal */}
-          <div className="absolute top-2 right-2 z-10">
+          <div className="absolute top-4 right-4 z-10">
             <span className={`px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase rounded-md backdrop-blur-sm border transition-colors ${
               "active" in vault.status
                 ? "bg-green-50/90 dark:bg-green-950/50 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
@@ -187,11 +189,7 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
               </span>
               <div className="flex items-center gap-1.5">
                 <span className={`font-medium tabular-nums flex items-center gap-1 ${userBalance > BigInt(0) ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-gray-600"}`}>
-                  {checkingBalance ? (
-                    <span className="flex items-center gap-1 text-gray-500 dark:text-gray-500">
-                      <div className="animate-spin rounded-full h-2 w-2 border border-current border-t-transparent"></div>
-                    </span>
-                  ) : balanceLoading && userBalance === BigInt(0) ? (
+                  {balanceLoading && userBalance === BigInt(0) ? (
                     <span className="flex items-center gap-1 text-gray-500 dark:text-gray-500">
                       <div className="animate-spin rounded-full h-2 w-2 border border-current border-t-transparent"></div>
                     </span>
@@ -201,37 +199,12 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
                         <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping"></span>
                         <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                       </span>
-                      {formatTokenAmount(userBalance)} <span className="text-[10px] opacity-70">({userPercentage.toFixed(1)}%)</span>
+                      {formatTokenAmount(userBalance)} <span className="text-[10px] opacity-70">({Math.min(userPercentage, 100).toFixed(1)}%)</span>
                     </>
                   ) : (
                     <span className="text-gray-400 dark:text-gray-600">—</span>
                   )}
                 </span>
-                {publicKey && !checkingBalance && (
-                  <button
-                    onClick={async () => {
-                      setCheckingBalance(true);
-                      try {
-                        console.log(`[VaultCard] Manually checking balance for vault ${vault.publicKey.toBase58().slice(0, 8)}..., mint: ${vault.fractionMint.toBase58().slice(0, 8)}...`);
-                        const balance = await fetchBalance(vault.fractionMint);
-                        console.log(`[VaultCard] Manual balance check result: ${balance.toString()}`);
-                        if (onBalanceUpdate) {
-                          onBalanceUpdate(vault.fractionMint.toBase58(), balance);
-                        } else {
-                          window.location.reload();
-                        }
-                      } catch (err) {
-                        console.error(`[VaultCard] Error manually checking balance:`, err);
-                      } finally {
-                        setCheckingBalance(false);
-                      }
-                    }}
-                    className="text-[10px] text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
-                    title="Refresh balance"
-                  >
-                    ↻
-                  </button>
-                )}
               </div>
             </div>
 

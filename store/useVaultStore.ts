@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { PublicKey, Connection } from "@solana/web3.js";
 import { Program, AnchorProvider, EventParser } from "@coral-xyz/anchor";
 import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
@@ -36,6 +37,81 @@ export interface VaultData {
   tokensInEscrow: bigint;
 }
 
+// Serialized version for persistence (PublicKey -> string, bigint -> string)
+interface SerializedVaultData {
+  publicKey: string;
+  nftMint: string;
+  nftAssetId: string;
+  fractionMint: string;
+  totalSupply: string;
+  creator: string;
+  creationTimestamp: string;
+  status: VaultStatus;
+  reclaimTimestamp: string;
+  twapPriceAtReclaim: string;
+  totalCompensation: string;
+  remainingCompensation: string;
+  bump: number;
+  minLpAgeSeconds: string;
+  minReclaimPercentage: number;
+  minLiquidityPercent: number;
+  minVolumePercent30d: number;
+  reclaimInitiator: string;
+  reclaimInitiationTimestamp: string;
+  tokensInEscrow: string;
+}
+
+// Helper functions to serialize/deserialize vault data
+function serializeVaultData(vault: VaultData): SerializedVaultData {
+  return {
+    publicKey: vault.publicKey.toBase58(),
+    nftMint: vault.nftMint.toBase58(),
+    nftAssetId: vault.nftAssetId.toBase58(),
+    fractionMint: vault.fractionMint.toBase58(),
+    totalSupply: vault.totalSupply.toString(),
+    creator: vault.creator.toBase58(),
+    creationTimestamp: vault.creationTimestamp.toString(),
+    status: vault.status,
+    reclaimTimestamp: vault.reclaimTimestamp.toString(),
+    twapPriceAtReclaim: vault.twapPriceAtReclaim.toString(),
+    totalCompensation: vault.totalCompensation.toString(),
+    remainingCompensation: vault.remainingCompensation.toString(),
+    bump: vault.bump,
+    minLpAgeSeconds: vault.minLpAgeSeconds.toString(),
+    minReclaimPercentage: vault.minReclaimPercentage,
+    minLiquidityPercent: vault.minLiquidityPercent,
+    minVolumePercent30d: vault.minVolumePercent30d,
+    reclaimInitiator: vault.reclaimInitiator.toBase58(),
+    reclaimInitiationTimestamp: vault.reclaimInitiationTimestamp.toString(),
+    tokensInEscrow: vault.tokensInEscrow.toString(),
+  };
+}
+
+function deserializeVaultData(serialized: SerializedVaultData): VaultData {
+  return {
+    publicKey: new PublicKey(serialized.publicKey),
+    nftMint: new PublicKey(serialized.nftMint),
+    nftAssetId: new PublicKey(serialized.nftAssetId),
+    fractionMint: new PublicKey(serialized.fractionMint),
+    totalSupply: BigInt(serialized.totalSupply),
+    creator: new PublicKey(serialized.creator),
+    creationTimestamp: BigInt(serialized.creationTimestamp),
+    status: serialized.status,
+    reclaimTimestamp: BigInt(serialized.reclaimTimestamp),
+    twapPriceAtReclaim: BigInt(serialized.twapPriceAtReclaim),
+    totalCompensation: BigInt(serialized.totalCompensation),
+    remainingCompensation: BigInt(serialized.remainingCompensation),
+    bump: serialized.bump,
+    minLpAgeSeconds: BigInt(serialized.minLpAgeSeconds),
+    minReclaimPercentage: serialized.minReclaimPercentage,
+    minLiquidityPercent: serialized.minLiquidityPercent,
+    minVolumePercent30d: serialized.minVolumePercent30d,
+    reclaimInitiator: new PublicKey(serialized.reclaimInitiator),
+    reclaimInitiationTimestamp: BigInt(serialized.reclaimInitiationTimestamp),
+    tokensInEscrow: BigInt(serialized.tokensInEscrow),
+  };
+}
+
 interface VaultStoreState {
   // All vaults stored in the store (fetched but not all exposed)
   allVaults: VaultData[];
@@ -68,6 +144,7 @@ interface VaultStoreState {
   setupEventListeners: (endpoint: string, network: WalletAdapterNetwork, wallet: WalletAdapter | null) => Promise<void>;
   cleanupEventListeners: () => void;
   debouncedRefetch: (endpoint: string, network: WalletAdapterNetwork, wallet: WalletAdapter | null, publicKey: PublicKey | null) => void;
+  fetchAndBringVaultToFront: (vaultPublicKey: PublicKey, endpoint: string, network: WalletAdapterNetwork, wallet: WalletAdapter | null) => Promise<void>;
   
   // Getters
   getActiveVaults: () => VaultData[];
@@ -77,21 +154,31 @@ interface VaultStoreState {
   hasMoreVaults: () => boolean;
 }
 
-const useVaultStore = create<VaultStoreState>()((set, get) => ({
-  allVaults: [],
-  loadedCount: 0,
-  totalCount: 0,
-  loading: false,
-  loadingMore: false,
-  error: null,
-  lastFetched: null,
-  eventListenerId: null,
-  connection: null,
-  refetchTimeoutId: null,
-  currentEndpoint: null,
-  currentNetwork: null,
-  currentWallet: null,
-  currentPublicKey: null,
+// Persisted state interface (only serializable fields)
+interface PersistedVaultStoreState {
+  allVaults: SerializedVaultData[];
+  loadedCount: number;
+  totalCount: number;
+  lastFetched: number | null;
+}
+
+const useVaultStore = create<VaultStoreState>()(
+  persist(
+    (set, get) => ({
+      allVaults: [],
+      loadedCount: 0,
+      totalCount: 0,
+      loading: false,
+      loadingMore: false,
+      error: null,
+      lastFetched: null,
+      eventListenerId: null,
+      connection: null,
+      refetchTimeoutId: null,
+      currentEndpoint: null,
+      currentNetwork: null,
+      currentWallet: null,
+      currentPublicKey: null,
 
   fetchInitialVaults: async (endpoint: string, network: WalletAdapterNetwork, wallet: WalletAdapter | null, publicKey: PublicKey | null, limit: number = 10) => {
     // Don't fetch if wallet is not connected
@@ -291,11 +378,39 @@ const useVaultStore = create<VaultStoreState>()((set, get) => ({
             const fractionalizedEvent = parsed.find((e: any) => e.name === 'fractionalized');
             
             if (fractionalizedEvent) {
-              console.log("[VaultStore] Fractionalized event detected, scheduling refetch...");
-              // Use debounced refetch to avoid 429 errors
-              const state = get();
-              if (state.currentEndpoint && state.currentNetwork && state.currentPublicKey) {
-                get().debouncedRefetch(state.currentEndpoint, state.currentNetwork, state.currentWallet, state.currentPublicKey);
+              console.log("[VaultStore] Fractionalized event detected:", fractionalizedEvent);
+              // Extract vault public key from event
+              // Anchor events have data in fractionalizedEvent.data, and pubkeys might be PublicKey objects or strings
+              const eventData = fractionalizedEvent.data || fractionalizedEvent;
+              const vaultPublicKey = eventData.vault;
+              
+              if (vaultPublicKey) {
+                try {
+                  // Handle both PublicKey objects and string/base58 representations
+                  const vaultPubkey = vaultPublicKey instanceof PublicKey 
+                    ? vaultPublicKey 
+                    : new PublicKey(vaultPublicKey);
+                  console.log("[VaultStore] Fetching new vault and bringing to front:", vaultPubkey.toBase58());
+                  const state = get();
+                  if (state.currentEndpoint && state.currentNetwork) {
+                    // Fetch just this vault and bring it to the front
+                    get().fetchAndBringVaultToFront(vaultPubkey, state.currentEndpoint, state.currentNetwork, state.currentWallet);
+                  }
+                } catch (err) {
+                  console.error("[VaultStore] Error parsing vault public key from event:", err);
+                  // Fallback to debounced refetch
+                  const state = get();
+                  if (state.currentEndpoint && state.currentNetwork && state.currentPublicKey) {
+                    get().debouncedRefetch(state.currentEndpoint, state.currentNetwork, state.currentWallet, state.currentPublicKey);
+                  }
+                }
+              } else {
+                // Fallback to debounced refetch if we can't get vault public key
+                console.log("[VaultStore] No vault public key in event, scheduling refetch...");
+                const state = get();
+                if (state.currentEndpoint && state.currentNetwork && state.currentPublicKey) {
+                  get().debouncedRefetch(state.currentEndpoint, state.currentNetwork, state.currentWallet, state.currentPublicKey);
+                }
               }
             }
           } catch (err) {
@@ -378,6 +493,97 @@ const useVaultStore = create<VaultStoreState>()((set, get) => ({
     set({ refetchTimeoutId: timeoutId });
   },
 
+  fetchAndBringVaultToFront: async (vaultPublicKey: PublicKey, endpoint: string, network: WalletAdapterNetwork, wallet: WalletAdapter | null) => {
+    const state = get();
+    
+    try {
+      const isDevnet = network === WalletAdapterNetwork.Devnet;
+      const devnetEndpoint = isDevnet
+        ? (endpoint.includes("devnet") || endpoint.includes("dev") || endpoint.includes("api.devnet")
+           ? endpoint
+           : "https://api.devnet.solana.com")
+        : endpoint;
+
+      const connection = new Connection(devnetEndpoint, "confirmed");
+      const provider = new AnchorProvider(
+        connection,
+        wallet as any,
+        { commitment: "confirmed" }
+      );
+
+      const program = new Program<Fractionalization>(
+        FractionalizationIdl as any,
+        provider
+      );
+
+      // Fetch just this vault account
+      console.log("[VaultStore] Fetching vault account:", vaultPublicKey.toBase58());
+      const vaultAccount = await program.account.vault.fetch(vaultPublicKey);
+      
+      // Convert to VaultData format
+      const vaultData: VaultData = {
+        publicKey: vaultPublicKey,
+        nftMint: vaultAccount.nftMint,
+        nftAssetId: vaultAccount.nftAssetId,
+        fractionMint: vaultAccount.fractionMint,
+        totalSupply: BigInt(vaultAccount.totalSupply.toString()),
+        creator: vaultAccount.creator,
+        creationTimestamp: BigInt(vaultAccount.creationTimestamp.toString()),
+        status: vaultAccount.status as VaultStatus,
+        reclaimTimestamp: BigInt(vaultAccount.reclaimTimestamp.toString()),
+        twapPriceAtReclaim: BigInt(vaultAccount.twapPriceAtReclaim.toString()),
+        totalCompensation: BigInt(vaultAccount.totalCompensation.toString()),
+        remainingCompensation: BigInt(vaultAccount.remainingCompensation.toString()),
+        bump: vaultAccount.bump,
+        minLpAgeSeconds: BigInt(vaultAccount.minLpAgeSeconds.toString()),
+        minReclaimPercentage: vaultAccount.minReclaimPercentage,
+        minLiquidityPercent: vaultAccount.minLiquidityPercent,
+        minVolumePercent30d: vaultAccount.minVolumePercent30d,
+        reclaimInitiator: vaultAccount.reclaimInitiator,
+        reclaimInitiationTimestamp: BigInt(vaultAccount.reclaimInitiationTimestamp.toString()),
+        tokensInEscrow: BigInt(vaultAccount.tokensInEscrow.toString()),
+      };
+
+      // Only process if vault is active
+      if (!("active" in vaultData.status)) {
+        console.log("[VaultStore] Vault is not active, skipping");
+        return;
+      }
+
+      // Update the store: remove existing vault if it exists, then add to front
+      const existingVaults = state.allVaults;
+      const filteredVaults = existingVaults.filter(v => v.publicKey.toBase58() !== vaultPublicKey.toBase58());
+      
+      // Add new vault to the front
+      const updatedVaults = [vaultData, ...filteredVaults];
+      
+      // Update loadedCount if needed (if we're showing vaults and this is a new one)
+      let newLoadedCount = state.loadedCount;
+      if (state.loadedCount > 0) {
+        // If we had vaults loaded, increment the count to include this new one
+        newLoadedCount = Math.min(state.loadedCount + 1, updatedVaults.length);
+      } else {
+        // If no vaults were loaded, set to 1
+        newLoadedCount = 1;
+      }
+
+      console.log(`[VaultStore] Added vault to front. Total vaults: ${updatedVaults.length}, Loaded: ${newLoadedCount}`);
+      
+      set({
+        allVaults: updatedVaults,
+        totalCount: updatedVaults.length,
+        loadedCount: newLoadedCount,
+        lastFetched: Date.now(),
+      });
+    } catch (err: any) {
+      console.error("[VaultStore] Error fetching vault:", err);
+      // If fetching single vault fails, fall back to debounced refetch
+      if (state.currentPublicKey) {
+        get().debouncedRefetch(endpoint, network, wallet, state.currentPublicKey);
+      }
+    }
+  },
+
   getActiveVaults: () => {
     const state = get();
     // All vaults in store are already filtered to active, so just return all of them
@@ -407,7 +613,50 @@ const useVaultStore = create<VaultStoreState>()((set, get) => ({
     const end = start + perPage;
     return vaults.slice(start, end);
   },
-}));
+    }),
+    {
+      name: 'vault-store',
+      storage: createJSONStorage(() => localStorage),
+      // Only persist specific fields, serialize vaults
+      partialize: (state) => ({
+        allVaults: state.allVaults.map(serializeVaultData),
+        loadedCount: state.loadedCount,
+        totalCount: state.totalCount,
+        lastFetched: state.lastFetched,
+      }),
+      // Deserialize on rehydration
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error('[VaultStore] Error rehydrating store:', error);
+          return;
+        }
+        if (state) {
+          try {
+            // State has been restored from storage with serialized data
+            // Deserialize vaults from SerializedVaultData[] to VaultData[]
+            if (state.allVaults && Array.isArray(state.allVaults) && state.allVaults.length > 0) {
+              // Check if first item is already deserialized (has PublicKey)
+              const first = state.allVaults[0];
+              if (first && !(first.publicKey instanceof PublicKey)) {
+                // Need to deserialize
+                state.allVaults = state.allVaults.map((v: any) => deserializeVaultData(v as SerializedVaultData));
+                console.log('[VaultStore] Rehydrated', state.allVaults.length, 'vaults from storage');
+              } else {
+                console.log('[VaultStore] Vaults already deserialized');
+              }
+            }
+          } catch (err) {
+            console.error('[VaultStore] Error deserializing vaults:', err);
+            // Reset to empty if deserialization fails
+            state.allVaults = [];
+            state.loadedCount = 0;
+            state.totalCount = 0;
+          }
+        }
+      },
+    }
+  )
+);
 
 export default useVaultStore;
 

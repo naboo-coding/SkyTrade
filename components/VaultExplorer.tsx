@@ -474,76 +474,9 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
     }
   };
 
-  if (loading && vaults.length === 0) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading vaults...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="text-center">
-          <p className="text-red-600 dark:text-red-400 mb-4">Error loading vaults: {error}</p>
-          <button
-            onClick={refetch}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Show message when wallet is not connected
-  if (!publicKey && !loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400">
-            Connect your wallet to view your vaults
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (vaults.length === 0 && !loading && publicKey) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-2">No vaults found</p>
-          <p className="text-sm text-gray-500 dark:text-gray-500">
-            {error ? `Error: ${error}` : "No active vaults in the protocol"}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (filteredVaults.length === 0 && vaults.length > 0 && !loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-2">No vaults match the current filters</p>
-          <p className="text-sm text-gray-500 dark:text-gray-500">
-            {showOnlyMine 
-              ? "You haven't created any vaults, or all vaults are being validated..."
-              : "All vaults are being validated or filtered out..."}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="w-full">
+      {/* Header - always visible */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -555,121 +488,155 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
                 {showOnlyMine ? "Your fractionalized cNFTs" : "Explore all fractionalized cNFTs"}
               </p>
             </div>
-            <button
-              onClick={() => setShowEscrowPanel(true)}
-              className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-              title="View Escrow"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {publicKey && (
+              <button
+                onClick={() => setShowEscrowPanel(true)}
+                className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                title="View Escrow"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2.5">
             {publicKey && (
-              <>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showOnlyMine}
-                    onChange={(e) => {
-                      setShowOnlyMine(e.target.checked);
-                    }}
-                    className="w-3.5 h-3.5 text-gray-900 dark:text-gray-100 rounded focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-600"
-                  />
-                  <span className="text-xs text-gray-600 dark:text-gray-400">Show only mine</span>
-                </label>
-                <button
-                  onClick={() => {
-                    const fractionMints = filteredVaults.map((v) => v.fractionMint);
-                    console.log("Manual refresh: Fetching balances for", fractionMints.length, "vaults");
-                    fetchBalances(fractionMints);
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showOnlyMine}
+                  onChange={(e) => {
+                    setShowOnlyMine(e.target.checked);
                   }}
-                  className="px-3 py-1.5 bg-gray-900 dark:bg-gray-100 hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-gray-900 rounded-lg font-medium transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                  disabled={loading || balancesLoading}
-                >
-                  {loading || balancesLoading ? (
-                    <span className="flex items-center gap-1.5">
-                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent"></div>
-                      Refreshing...
-                    </span>
-                  ) : (
-                    "Refresh"
-                  )}
-                </button>
-              </>
+                  className="w-3.5 h-3.5 text-gray-900 dark:text-gray-100 rounded focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-600"
+                />
+                <span className="text-xs text-gray-600 dark:text-gray-400">Show only mine</span>
+              </label>
             )}
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-        {displayedVaults.map((vault) => {
-          const balance = balances.get(vault.fractionMint.toBase58()) ?? BigInt(0);
-          const isThisVaultProcessing = processingVault === vault.publicKey.toBase58();
-          const hasBalance = balance > BigInt(0);
-          
-          // Debug logging
-          if (publicKey && hasBalance) {
-            console.log(`[VaultExplorer] Vault ${vault.publicKey.toBase58().slice(0, 8)}... has balance: ${balance.toString()}`);
-          }
-          
-          return (
-            <VaultCard
-              key={vault.publicKey.toBase58()}
-              vault={vault}
-              userBalance={balance}
-              onInitializeReclaim={handleInitializeReclaim}
-              isProcessing={isThisVaultProcessing && reclaimLoading}
-              balanceLoading={balancesLoading}
-              onBalanceUpdate={updateBalance}
-            />
-          );
-        })}
-      </div>
-
-      {hasMore && (
-        <div className="flex justify-center mt-6">
-          {loadingMore ? (
-            <div className="flex items-center justify-center gap-2 px-4 py-2">
-              <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-400 dark:border-gray-500 border-t-transparent"></div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">Loading more vaults...</span>
-            </div>
-          ) : (
+      {/* Content - only show when wallet is connected */}
+      {!publicKey ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <p className="text-gray-600 dark:text-gray-400">
+              Connect your wallet to view vaults
+            </p>
+          </div>
+        </div>
+      ) : loading && vaults.length === 0 ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading vaults...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <p className="text-red-600 dark:text-red-400 mb-4">Error loading vaults: {error}</p>
             <button
-              onClick={handleLoadMore}
-              className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium shadow-sm"
+              onClick={refetch}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
-              Load More
+              Retry
             </button>
+          </div>
+        </div>
+      ) : vaults.length === 0 && !loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <p className="text-gray-600 dark:text-gray-400 mb-2">No vaults found</p>
+            <p className="text-sm text-gray-500 dark:text-gray-500">
+              {error ? `Error: ${error}` : "No active vaults in the protocol"}
+            </p>
+          </div>
+        </div>
+      ) : filteredVaults.length === 0 && vaults.length > 0 && !loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <p className="text-gray-600 dark:text-gray-400 mb-2">No vaults match the current filters</p>
+            <p className="text-sm text-gray-500 dark:text-gray-500">
+              {showOnlyMine 
+                ? "You haven't created any vaults, or all vaults are being validated..."
+                : "All vaults are being validated or filtered out..."}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+            {displayedVaults.map((vault) => {
+              const balance = balances.get(vault.fractionMint.toBase58()) ?? BigInt(0);
+              const isThisVaultProcessing = processingVault === vault.publicKey.toBase58();
+              const hasBalance = balance > BigInt(0);
+              
+              // Debug logging
+              if (publicKey && hasBalance) {
+                console.log(`[VaultExplorer] Vault ${vault.publicKey.toBase58().slice(0, 8)}... has balance: ${balance.toString()}`);
+              }
+              
+              return (
+                <VaultCard
+                  key={vault.publicKey.toBase58()}
+                  vault={vault}
+                  userBalance={balance}
+                  onInitializeReclaim={handleInitializeReclaim}
+                  isProcessing={isThisVaultProcessing && reclaimLoading}
+                  balanceLoading={balancesLoading}
+                  onBalanceUpdate={updateBalance}
+                />
+              );
+            })}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              {loadingMore ? (
+                <div className="flex items-center justify-center gap-2 px-4 py-2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-400 dark:border-gray-500 border-t-transparent"></div>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Loading more vaults...</span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleLoadMore}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium shadow-sm"
+                >
+                  Load More
+                </button>
+              )}
+            </div>
           )}
-        </div>
-      )}
 
-      {filteredVaults.length > 0 && (
-        <div className="text-center mt-4 text-xs text-gray-500 dark:text-gray-400">
-          Showing {displayedVaults.length} of {filteredVaults.length} vaults
-          {hasMore && " (load more to see all)"}
-          {showOnlyMine && publicKey && ` (created by you)`}
-        </div>
-      )}
+          {filteredVaults.length > 0 && (
+            <div className="text-center mt-4 text-xs text-gray-500 dark:text-gray-400">
+              Showing {displayedVaults.length} of {filteredVaults.length} vaults
+              {hasMore && " (load more to see all)"}
+              {showOnlyMine && publicKey && ` (created by you)`}
+            </div>
+          )}
 
-      {showOnlyMine && filteredVaults.length === 0 && publicKey && (
-        <div className="text-center py-12">
-          <p className="text-gray-600 dark:text-gray-400">
-            You haven't created any vaults yet. Fractionalize your cNFTs to see them here.
-          </p>
-        </div>
+          {showOnlyMine && filteredVaults.length === 0 && publicKey && (
+            <div className="text-center py-12">
+              <p className="text-gray-600 dark:text-gray-400">
+                You haven't created any vaults yet. Fractionalize your cNFTs to see them here.
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Success modal */}
