@@ -73,6 +73,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
   const [showOnlyMine, setShowOnlyMine] = useState(false);
   const [showEscrowPanel, setShowEscrowPanel] = useState(false);
   const [escrowData, setEscrowData] = useState<EscrowData[]>([]);
+  const [escrowDisplayCount, setEscrowDisplayCount] = useState(0);
   const [loadingEscrow, setLoadingEscrow] = useState(false);
 
   const { publicKey, wallet } = useWallet();
@@ -191,6 +192,8 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
     if (!endpoint) return;
 
     setLoadingEscrow(true);
+    setEscrowData([]);
+    setEscrowDisplayCount(0);
     try {
       const dummyWallet = {
         publicKey: publicKey || PublicKey.default,
@@ -275,7 +278,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
       console.log(`[Escrow] Filtered to ${vaultsWithEscrow.length} vaults with escrow status`);
 
       // Fetch NFT metadata and build the escrow data list
-      const escrowDataList: EscrowData[] = [];
+      const processedEscrow: EscrowData[] = [];
       for (let i = 0; i < vaultsWithEscrow.length; i++) {
         const vault = vaultsWithEscrow[i];
         try {
@@ -337,7 +340,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
             // Silently fail metadata fetch
           }
 
-          escrowDataList.push({
+          processedEscrow.push({
             vault,
             tokensInEscrow: vault.tokensInEscrow,
             remainingCompensation: vault.remainingCompensation,
@@ -346,26 +349,42 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
             nftName,
             nftImage,
           });
+
+          // Maintain sort order as entries arrive
+          processedEscrow.sort((a, b) => {
+            if (a.isEscrowActive !== b.isEscrowActive) {
+              return a.isEscrowActive ? -1 : 1;
+            }
+            const aTime = Number(a.vault.reclaimInitiationTimestamp);
+            const bTime = Number(b.vault.reclaimInitiationTimestamp);
+            return bTime - aTime;
+          });
+
+          const currentLength = processedEscrow.length;
+
+          setEscrowData(() => [...processedEscrow]);
+          setEscrowDisplayCount(prev => {
+            const initialVisible = Math.min(currentLength, 10);
+            if (prev === 0) {
+              return initialVisible;
+            }
+            if (prev < 10) {
+              return Math.min(initialVisible, 10);
+            }
+            if (prev > currentLength) {
+              return currentLength;
+            }
+            return prev;
+          });
         } catch (err) {
           console.error(`Error processing vault ${vault.publicKey.toBase58()}:`, err);
         }
       }
 
-      // Sort by most recent first (active first, then by most recent reclaim initiation time)
-      escrowDataList.sort((a, b) => {
-        if (a.isEscrowActive !== b.isEscrowActive) {
-          return a.isEscrowActive ? -1 : 1;
-        }
-        // Sort by reclaim initiation timestamp (most recent first)
-        const aTime = Number(a.vault.reclaimInitiationTimestamp);
-        const bTime = Number(b.vault.reclaimInitiationTimestamp);
-        return bTime - aTime; // Descending order (newest first)
-      });
-
-      setEscrowData(escrowDataList);
     } catch (err: any) {
       console.error("Error fetching escrow vaults:", err);
       setEscrowData([]);
+      setEscrowDisplayCount(0);
     } finally {
       setLoadingEscrow(false);
     }
@@ -374,9 +393,17 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
   // Fetch escrow data whenever the panel opens
   useEffect(() => {
     if (showEscrowPanel) {
+      setEscrowDisplayCount(0);
       fetchEscrowVaults();
     }
   }, [showEscrowPanel, fetchEscrowVaults]);
+  const handleLoadMoreEscrow = useCallback(() => {
+    setEscrowDisplayCount(prev => {
+      const next = prev + 10;
+      return Math.min(next, escrowData.length);
+    });
+  }, [escrowData.length]);
+
 
   // Let the parent component know when the escrow panel opens or closes
   useEffect(() => {
@@ -704,7 +731,7 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
 
             {/* Panel content */}
             <div className="flex-1 overflow-y-auto p-4">
-              {loadingEscrow ? (
+              {loadingEscrow && escrowData.length === 0 ? (
                 <div className="flex justify-center items-center py-12">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 dark:border-gray-700 border-t-gray-600 dark:border-t-gray-400 mx-auto mb-3"></div>
@@ -722,11 +749,19 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
                 </div>
               ) : (
                 <>
+                  {loadingEscrow && escrowData.length > 0 && (
+                    <div className="flex justify-center items-center py-3">
+                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent"></div>
+                        Loading more escrow vaults...
+                      </div>
+                    </div>
+                  )}
                   <div className="mb-4 text-xs text-gray-500 dark:text-gray-400">
                     Showing {escrowData.length} vault{escrowData.length !== 1 ? "s" : ""} with escrow data
                   </div>
                   <div className="space-y-3">
-                    {escrowData.map((data) => (
+                    {escrowData.slice(0, escrowDisplayCount).map((data) => (
                       <div
                         key={data.vault.publicKey.toBase58()}
                         className="bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 p-4"
@@ -802,6 +837,16 @@ export default function VaultExplorer({ onEscrowPanelChange }: VaultExplorerProp
                       </div>
                     ))}
                   </div>
+                  {escrowDisplayCount < escrowData.length && (
+                    <div className="flex justify-center mt-4">
+                      <button
+                        onClick={handleLoadMoreEscrow}
+                        className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium shadow-sm"
+                      >
+                        Load More
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>

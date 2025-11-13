@@ -105,52 +105,52 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
   };
 
   return (
-    <div className="group relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 overflow-hidden hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-300 hover:shadow-md">
-      <div className="relative">
-        {/* Image Section - Contained Frame */}
-        <div className="relative w-full p-3 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-          {/* Contained image frame */}
-          <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700/50">
-            {assetLoading ? (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 dark:border-gray-700 border-t-gray-600 dark:border-t-gray-400"></div>
-              </div>
-            ) : nftImage && !imageError ? (
-              <img
-                src={nftImage}
-                alt={nftName}
-                className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
-                onError={() => setImageError(true)}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800/50">
-                <svg
-                  className="w-10 h-10 text-gray-300 dark:text-gray-700"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
-            )}
+    <div className="group relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/70 dark:border-gray-800/70 overflow-hidden hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-300 hover:shadow-md">
+      <div className="p-4 flex flex-col gap-3">
+        {/* Top section with image and status */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="relative flex-shrink-0">
+            <div className="relative h-36 w-36 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 overflow-hidden shadow-sm">
+              {assetLoading ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-300 dark:border-gray-700 border-t-gray-600 dark:border-t-gray-400"></div>
+                </div>
+              ) : nftImage && !imageError ? (
+                <img
+                  src={nftImage}
+                  alt={nftName}
+                  className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800/50">
+                  <svg
+                    className="w-8 h-8 text-gray-300 dark:text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+              )}
+            </div>
           </div>
-          
-          {/* Status Badge - Minimal */}
-          <div className="absolute top-4 right-4 z-10">
-            <span className={`px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase rounded-md backdrop-blur-sm border transition-colors ${
+
+          <div className="flex flex-col items-end gap-1 ml-auto">
+            <span className={`px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase rounded-md border transition-colors ${
               "active" in vault.status
-                ? "bg-green-50/90 dark:bg-green-950/50 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
+                ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
                 : "reclaimInitiated" in vault.status
-                ? "bg-amber-50/90 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
                 : "reclaimFinalized" in vault.status
-                ? "bg-blue-50/90 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800"
-                : "bg-gray-50/90 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
+                ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                : "bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"
             }`}>
               {getStatusDisplay()}
             </span>
@@ -158,7 +158,7 @@ export default function VaultCard({ vault, userBalance, onInitializeReclaim, isP
         </div>
 
         {/* Content Section - Slim */}
-        <div className="p-3 space-y-2.5">
+        <div className="space-y-2.5">
           {/* Name */}
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate leading-tight">
             {nftName}
